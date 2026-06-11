@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   History,
@@ -10,6 +11,8 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { getInitials, getSession, type Session } from "@/lib/storage";
+import { pet, tutor } from "@/lib/mock-data";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -21,6 +24,18 @@ const navItems = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [session, setSessionState] = useState<Session | null>(null);
+
+  useEffect(() => {
+    setSessionState(getSession());
+  }, [pathname]);
+
+  const displayName = session?.name ?? tutor.name;
+  const displayInitials = getInitials(displayName) || tutor.initials;
+  const displaySubtitle =
+    session?.userType === "especialista"
+      ? "Especialista · MediPet"
+      : `Tutora · ${pet.name}`;
 
   return (
     <div className="min-h-screen bg-background">
@@ -61,11 +76,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="border-t border-sidebar-border p-4">
           <div className="flex items-center gap-3 rounded-xl bg-accent/50 p-3">
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-              MC
+              {displayInitials}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-sidebar-foreground">Mariana Costa</p>
-              <p className="truncate text-xs text-muted-foreground">Tutora · Theo</p>
+              <p className="truncate text-sm font-semibold text-sidebar-foreground">{displayName}</p>
+              <p className="truncate text-xs text-muted-foreground">{displaySubtitle}</p>
             </div>
           </div>
         </div>

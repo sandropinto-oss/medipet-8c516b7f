@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   Search,
   FileHeart,
@@ -10,13 +11,17 @@ import {
   Heart,
   Shield,
   Activity,
+  Stethoscope,
 } from "lucide-react";
+import { requireAuth } from "@/lib/auth-guard";
+import { getSession, getSpecialistProfile, type Session, type SpecialistProfile } from "@/lib/storage";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { activeStay, caregivers, tutor, pet } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/")({
+  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "MediPet — Hospedagem técnica veterinária" },
@@ -44,17 +49,64 @@ const quickActions = [
 
 function Dashboard() {
   const progress = (activeStay.dayCurrent / activeStay.dayTotal) * 100;
+  const [session, setSessionState] = useState<Session | null>(null);
+  const [specialist, setSpecialist] = useState<SpecialistProfile | null>(null);
+
+  useEffect(() => {
+    const current = getSession();
+    setSessionState(current);
+    if (current?.userType === "especialista") {
+      setSpecialist(getSpecialistProfile());
+    }
+  }, []);
+
+  const firstName = (session?.name ?? tutor.name).split(" ")[0];
+  const isSpecialist = session?.userType === "especialista";
+
   return (
     <AppShell>
       <div className="grid gap-6 px-4 py-6 lg:grid-cols-[1fr_360px] lg:gap-8 lg:px-8 lg:py-8">
         <div className="space-y-6">
           {/* Header */}
           <div>
-            <p className="text-sm text-muted-foreground">Olá, {tutor.name.split(" ")[0]} 👋</p>
+            <p className="text-sm text-muted-foreground">Olá, {firstName} 👋</p>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Como o {pet.name} está hoje?
+              {isSpecialist ? "Seu painel profissional" : `Como o ${pet.name} está hoje?`}
             </h1>
           </div>
+
+          {/* Specialist profile card */}
+          {isSpecialist && specialist && (
+            <div className="overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-soft">
+              <div className="flex items-start gap-4">
+                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+                  <Stethoscope className="h-7 w-7" />
+                </div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div>
+                    <h2 className="text-xl font-bold">{specialist.name}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      CRMV-{specialist.uf} {specialist.crmv}
+                      {specialist.inst ? ` · ${specialist.inst}` : ""}
+                    </p>
+                  </div>
+                  {specialist.bio && (
+                    <p className="text-sm leading-relaxed text-muted-foreground">{specialist.bio}</p>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {specialist.specialties.map((s) => (
+                      <span
+                        key={s}
+                        className="rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground"
+                      >
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Active stay card */}
           <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary to-primary-glow p-6 text-primary-foreground shadow-card">

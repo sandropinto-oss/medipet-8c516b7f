@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireAuth } from "@/lib/auth-guard";
 import { FileHeart, ChevronRight, Calendar } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { history } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/historico")({
+  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "Histórico — MediPet" },

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Activity, Heart, Droplet, Thermometer, Check, Clock, AlertCircle, PawPrint } from "lucide-react";
 import {
   LineChart,
@@ -12,10 +13,13 @@ import {
   AreaChart,
 } from "recharts";
 import { AppShell } from "@/components/app-shell";
-import { pet, medications, glucoseData, heartRateData } from "@/lib/mock-data";
+import { pet, glucoseData, heartRateData } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+import { requireAuth } from "@/lib/auth-guard";
+import { getMedicationTasks, toggleMedicationTask, type MedicationTask } from "@/lib/storage";
 
 export const Route = createFileRoute("/monitoramento")({
+  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "Monitoramento — MediPet" },
@@ -26,6 +30,19 @@ export const Route = createFileRoute("/monitoramento")({
 });
 
 function MonitoringPage() {
+  const [tasks, setTasks] = useState<MedicationTask[]>([]);
+
+  useEffect(() => {
+    setTasks(getMedicationTasks());
+  }, []);
+
+  const completedCount = tasks.filter((t) => t.done).length;
+  const nextPendingIndex = tasks.findIndex((t) => !t.done);
+
+  const handleToggle = (index: number) => {
+    setTasks(toggleMedicationTask(index));
+  };
+
   return (
     <AppShell>
       <div className="space-y-6 px-4 py-6 lg:px-8 lg:py-8">
@@ -135,15 +152,17 @@ function MonitoringPage() {
               <p className="text-sm text-muted-foreground">Hoje · Sex, 12 jun</p>
             </div>
             <span className="rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">
-              3 de 6 concluídos
+              {completedCount} de {tasks.length} concluídos
             </span>
           </div>
           <div className="space-y-2">
-            {medications.map((m, i) => (
-              <div
-                key={i}
+            {tasks.map((m, i) => (
+              <button
+                key={`${m.time}-${m.name}`}
+                type="button"
+                onClick={() => handleToggle(i)}
                 className={cn(
-                  "flex items-center gap-4 rounded-xl border p-3 transition-colors",
+                  "flex w-full items-center gap-4 rounded-xl border p-3 text-left transition-colors hover:border-primary/40",
                   m.done ? "border-border bg-muted/40" : "border-border bg-card",
                 )}
               >
@@ -171,12 +190,12 @@ function MonitoringPage() {
                   </div>
                   <p className="text-xs text-muted-foreground">{m.time}</p>
                 </div>
-                {!m.done && i === 3 && (
+                {!m.done && i === nextPendingIndex && (
                   <span className="flex items-center gap-1 rounded-full bg-warning/15 px-2.5 py-1 text-[11px] font-semibold text-warning-foreground">
                     <AlertCircle className="h-3 w-3" /> Em breve
                   </span>
                 )}
-              </div>
+              </button>
             ))}
           </div>
         </div>

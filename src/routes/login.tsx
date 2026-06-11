@@ -1,11 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Stethoscope, Mail, Lock, ArrowRight } from "lucide-react";
+import { useState } from "react";
+import { Stethoscope, Mail, Lock, ArrowRight, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { redirectIfAuthenticated } from "@/lib/auth-guard";
+import { loginUser, registerUser, setSession } from "@/lib/storage";
+import type { UserType } from "@/lib/storage";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/login")({
+  beforeLoad: redirectIfAuthenticated,
   head: () => ({
     meta: [
       { title: "Entrar — MediPet" },
@@ -17,6 +23,47 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [userType, setUserType] = useState<UserType>("tutor");
+  const [error, setError] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (mode === "login") {
+      const result = loginUser(email, password);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      navigate({ to: "/" });
+      return;
+    }
+
+    if (!name.trim()) {
+      setError("Informe seu nome completo.");
+      return;
+    }
+
+    const result = registerUser({ email, password, name: name.trim(), userType });
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    setSession({
+      userId: result.user.id,
+      email: result.user.email,
+      name: result.user.name,
+      userType: result.user.userType,
+    });
+    navigate({ to: "/" });
+  };
+
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       {/* Brand panel */}
@@ -54,63 +101,156 @@ function LoginPage() {
             <span className="text-lg font-bold">MediPet</span>
           </div>
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Bem-vindo de volta</h2>
+            <h2 className="text-2xl font-bold tracking-tight">
+              {mode === "login" ? "Bem-vindo de volta" : "Criar conta"}
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Entre para acompanhar a saúde do seu pet.
+              {mode === "login"
+                ? "Entre para acompanhar a saúde do seu pet."
+                : "Cadastre-se para começar a usar o MediPet."}
             </p>
           </div>
 
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              navigate({ to: "/" });
-            }}
-          >
+          <div className="flex rounded-xl border border-border bg-muted/40 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("login");
+                setError("");
+              }}
+              className={cn(
+                "flex-1 rounded-lg py-2 text-sm font-semibold transition-colors",
+                mode === "login" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
+              )}
+            >
+              Entrar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signup");
+                setError("");
+              }}
+              className={cn(
+                "flex-1 rounded-lg py-2 text-sm font-semibold transition-colors",
+                mode === "signup" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
+              )}
+            >
+              Cadastro
+            </button>
+          </div>
+
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            {mode === "signup" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="name">Nome completo</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="name"
+                      type="text"
+                      placeholder="Seu nome"
+                      className="h-11 pl-9"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Tipo de usuário</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["tutor", "especialista"] as const).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setUserType(type)}
+                        className={cn(
+                          "rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors",
+                          userType === type
+                            ? "border-primary bg-accent text-accent-foreground"
+                            : "border-border bg-card hover:border-primary/40",
+                        )}
+                      >
+                        {type === "tutor" ? "Tutor" : "Especialista"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="email">E-mail</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input id="email" type="email" placeholder="voce@email.com" className="pl-9 h-11" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="voce@email.com"
+                  className="h-11 pl-9"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Senha</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input id="password" type="password" placeholder="••••••••" className="pl-9 h-11" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  className="h-11 pl-9"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={4}
+                />
               </div>
             </div>
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Checkbox defaultChecked /> Lembrar de mim
-              </label>
-              <a className="text-sm font-medium text-primary hover:underline" href="#">
-                Esqueci a senha
-              </a>
-            </div>
+            {mode === "login" && (
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Checkbox defaultChecked /> Lembrar de mim
+                </label>
+                <a className="text-sm font-medium text-primary hover:underline" href="#">
+                  Esqueci a senha
+                </a>
+              </div>
+            )}
+            {error && (
+              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+            )}
             <Button type="submit" className="h-11 w-full text-sm font-semibold">
-              Entrar <ArrowRight className="ml-1 h-4 w-4" />
+              {mode === "login" ? "Entrar" : "Criar conta"}{" "}
+              <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </form>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase tracking-wider">
-              <span className="bg-background px-3 text-muted-foreground">ou continue com</span>
-            </div>
-          </div>
+          {mode === "login" && (
+            <>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase tracking-wider">
+                  <span className="bg-background px-3 text-muted-foreground">ou continue com</span>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" className="h-11 gap-2">
-              <GoogleIcon /> Google
-            </Button>
-            <Button variant="outline" className="h-11 gap-2">
-              <AppleIcon /> Apple
-            </Button>
-          </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant="outline" className="h-11 gap-2">
+                  <GoogleIcon /> Google
+                </Button>
+                <Button variant="outline" className="h-11 gap-2">
+                  <AppleIcon /> Apple
+                </Button>
+              </div>
+            </>
+          )}
 
           <p className="text-center text-sm text-muted-foreground">
             É especialista veterinário?{" "}

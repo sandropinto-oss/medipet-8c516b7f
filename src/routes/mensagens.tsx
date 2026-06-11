@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireAuth } from "@/lib/auth-guard";
 import { Search, Send, Paperclip } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { messages } from "@/lib/mock-data";
@@ -6,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/mensagens")({
+  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "Mensagens — MediPet" },
