@@ -15,11 +15,10 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { pet, glucoseData, heartRateData } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
-import { requireAuth } from "@/lib/auth-guard";
+import { useRequireAuth } from "@/lib/auth-guard";
 import { getMedicationTasks, toggleMedicationTask, type MedicationTask } from "@/lib/storage";
 
 export const Route = createFileRoute("/monitoramento")({
-  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "Monitoramento — MediPet" },
@@ -30,6 +29,7 @@ export const Route = createFileRoute("/monitoramento")({
 });
 
 function MonitoringPage() {
+  useRequireAuth();
   const [tasks, setTasks] = useState<MedicationTask[]>([]);
 
   useEffect(() => {

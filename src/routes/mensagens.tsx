@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireAuth } from "@/lib/auth-guard";
+import { useRequireAuth } from "@/lib/auth-guard";
 import { Search, Send, Paperclip } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { messages } from "@/lib/mock-data";
@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/mensagens")({
-  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "Mensagens — MediPet" },
@@ -18,6 +17,7 @@ export const Route = createFileRoute("/mensagens")({
 });
 
 function MessagesPage() {
+  useRequireAuth();
   return (
     <AppShell>
       <div className="grid gap-4 px-4 py-6 lg:h-[calc(100vh-4rem)] lg:grid-cols-[340px_1fr] lg:gap-0 lg:px-0 lg:py-0">
