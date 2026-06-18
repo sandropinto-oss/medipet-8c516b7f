@@ -14,7 +14,110 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      perfis: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          crmv: string | null
+          documentos: Json
+          email: string | null
+          especialidades: string[]
+          id: string
+          instituicao: string | null
+          matricula: string | null
+          nome_completo: string
+          tipo_utilizador: Database["public"]["Enums"]["user_type"]
+          uf: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          crmv?: string | null
+          documentos?: Json
+          email?: string | null
+          especialidades?: string[]
+          id: string
+          instituicao?: string | null
+          matricula?: string | null
+          nome_completo?: string
+          tipo_utilizador?: Database["public"]["Enums"]["user_type"]
+          uf?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          crmv?: string | null
+          documentos?: Json
+          email?: string | null
+          especialidades?: string[]
+          id?: string
+          instituicao?: string | null
+          matricula?: string | null
+          nome_completo?: string
+          tipo_utilizador?: Database["public"]["Enums"]["user_type"]
+          uf?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pets: {
+        Row: {
+          alergias: string[]
+          created_at: string
+          especie: string | null
+          foto_url: string | null
+          id: string
+          idade: number | null
+          nome: string
+          patologia_cronica: string | null
+          peso: number | null
+          raca: string | null
+          tutor_id: string
+          updated_at: string
+        }
+        Insert: {
+          alergias?: string[]
+          created_at?: string
+          especie?: string | null
+          foto_url?: string | null
+          id?: string
+          idade?: number | null
+          nome: string
+          patologia_cronica?: string | null
+          peso?: number | null
+          raca?: string | null
+          tutor_id: string
+          updated_at?: string
+        }
+        Update: {
+          alergias?: string[]
+          created_at?: string
+          especie?: string | null
+          foto_url?: string | null
+          id?: string
+          idade?: number | null
+          nome?: string
+          patologia_cronica?: string | null
+          peso?: number | null
+          raca?: string | null
+          tutor_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pets_tutor_id_fkey"
+            columns: ["tutor_id"]
+            isOneToOne: false
+            referencedRelation: "perfis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +126,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      user_type: "tutor" | "especialista"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +253,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      user_type: ["tutor", "especialista"],
+    },
   },
 } as const
