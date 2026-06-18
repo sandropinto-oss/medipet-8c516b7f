@@ -1,17 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Stethoscope, Mail, Lock, ArrowRight, User } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { redirectIfAuthenticated } from "@/lib/auth-guard";
-import { loginUser, registerUser, setSession } from "@/lib/storage";
-import type { UserType } from "@/lib/storage";
+import { useRedirectIfAuthenticated } from "@/lib/auth-guard";
+import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/login")({
-  beforeLoad: redirectIfAuthenticated,
   head: () => ({
     meta: [
       { title: "Entrar — MediPet" },
@@ -22,51 +22,71 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
+  useRedirectIfAuthenticated();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [userType, setUserType] = useState<UserType>("tutor");
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    if (mode === "login") {
-      const result = loginUser(email, password);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
+  // Detect OAuth redirect callback — supabase auto-sets session, then redirect home.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash.includes("access_token")) {
       navigate({ to: "/" });
-      return;
     }
+  }, [navigate]);
 
-    if (!name.trim()) {
-      setError("Informe seu nome completo.");
-      return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      if (mode === "login") {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        toast.success("Bem-vindo de volta!");
+        navigate({ to: "/" });
+      } else {
+        if (!name.trim()) {
+          toast.error("Informe seu nome completo.");
+          return;
+        }
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: window.location.origin,
+            data: { nome_completo: name.trim(), tipo_utilizador: "tutor" },
+          },
+        });
+        if (error) throw error;
+        toast.success("Conta criada! Redirecionando…");
+        navigate({ to: "/" });
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao autenticar.");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const result = registerUser({ email, password, name: name.trim(), userType });
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-
-    setSession({
-      userId: result.user.id,
-      email: result.user.email,
-      name: result.user.name,
-      userType: result.user.userType,
+  const handleGoogle = async () => {
+    setLoading(true);
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin + "/login",
     });
+    if (result.error) {
+      toast.error("Falha ao entrar com Google.");
+      setLoading(false);
+      return;
+    }
+    if (result.redirected) return;
     navigate({ to: "/" });
   };
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      {/* Brand panel */}
       <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-primary via-primary to-primary-glow p-12 text-primary-foreground lg:flex">
         <div className="flex items-center gap-2">
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/15 backdrop-blur">
@@ -91,7 +111,6 @@ function LoginPage() {
         <div className="pointer-events-none absolute top-1/3 -left-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
       </div>
 
-      {/* Form */}
       <div className="flex items-center justify-center bg-background px-6 py-12">
         <div className="w-full max-w-sm space-y-6">
           <div className="flex items-center gap-2 lg:hidden">
@@ -114,10 +133,7 @@ function LoginPage() {
           <div className="flex rounded-xl border border-border bg-muted/40 p-1">
             <button
               type="button"
-              onClick={() => {
-                setMode("login");
-                setError("");
-              }}
+              onClick={() => setMode("login")}
               className={cn(
                 "flex-1 rounded-lg py-2 text-sm font-semibold transition-colors",
                 mode === "login" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
@@ -127,10 +143,7 @@ function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setMode("signup");
-                setError("");
-              }}
+              onClick={() => setMode("signup")}
               className={cn(
                 "flex-1 rounded-lg py-2 text-sm font-semibold transition-colors",
                 mode === "signup" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
@@ -142,73 +155,29 @@ function LoginPage() {
 
           <form className="space-y-4" onSubmit={handleSubmit}>
             {mode === "signup" && (
-              <>
-                <div className="space-y-1.5">
-                  <Label htmlFor="name">Nome completo</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="name"
-                      type="text"
-                      placeholder="Seu nome"
-                      className="h-11 pl-9"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                    />
-                  </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="name">Nome completo</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input id="name" type="text" placeholder="Seu nome" className="h-11 pl-9"
+                    value={name} onChange={(e) => setName(e.target.value)} required />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Tipo de usuário</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["tutor", "especialista"] as const).map((type) => (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => setUserType(type)}
-                        className={cn(
-                          "rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors",
-                          userType === type
-                            ? "border-primary bg-accent text-accent-foreground"
-                            : "border-border bg-card hover:border-primary/40",
-                        )}
-                      >
-                        {type === "tutor" ? "Tutor" : "Especialista"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
+              </div>
             )}
             <div className="space-y-1.5">
               <Label htmlFor="email">E-mail</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="voce@email.com"
-                  className="h-11 pl-9"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+                <Input id="email" type="email" placeholder="voce@email.com" className="h-11 pl-9"
+                  value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Senha</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  className="h-11 pl-9"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={4}
-                />
+                <Input id="password" type="password" placeholder="••••••••" className="h-11 pl-9"
+                  value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
               </div>
             </div>
             {mode === "login" && (
@@ -216,41 +185,26 @@ function LoginPage() {
                 <label className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Checkbox defaultChecked /> Lembrar de mim
                 </label>
-                <a className="text-sm font-medium text-primary hover:underline" href="#">
-                  Esqueci a senha
-                </a>
               </div>
             )}
-            {error && (
-              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
-            )}
-            <Button type="submit" className="h-11 w-full text-sm font-semibold">
-              {mode === "login" ? "Entrar" : "Criar conta"}{" "}
+            <Button type="submit" disabled={loading} className="h-11 w-full text-sm font-semibold">
+              {loading ? "Aguarde…" : mode === "login" ? "Entrar" : "Criar conta"}{" "}
               <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </form>
 
-          {mode === "login" && (
-            <>
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-border" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase tracking-wider">
-                  <span className="bg-background px-3 text-muted-foreground">ou continue com</span>
-                </div>
-              </div>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase tracking-wider">
+              <span className="bg-background px-3 text-muted-foreground">ou continue com</span>
+            </div>
+          </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" className="h-11 gap-2">
-                  <GoogleIcon /> Google
-                </Button>
-                <Button variant="outline" className="h-11 gap-2">
-                  <AppleIcon /> Apple
-                </Button>
-              </div>
-            </>
-          )}
+          <Button variant="outline" className="h-11 w-full gap-2" onClick={handleGoogle} disabled={loading}>
+            <GoogleIcon /> Continuar com Google
+          </Button>
 
           <p className="text-center text-sm text-muted-foreground">
             É especialista veterinário?{" "}
@@ -271,13 +225,6 @@ function GoogleIcon() {
       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.99.66-2.25 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"/>
       <path fill="#FBBC05" d="M5.84 14.11A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.45.34-2.11V7.05H2.18a11 11 0 0 0 0 9.9l3.66-2.84Z"/>
       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.05l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38Z"/>
-    </svg>
-  );
-}
-function AppleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
-      <path d="M16.37 12.62c-.02-2.18 1.78-3.22 1.86-3.27-1.01-1.48-2.59-1.69-3.16-1.71-1.34-.14-2.62.79-3.31.79-.69 0-1.74-.77-2.86-.75-1.47.02-2.83.86-3.59 2.17-1.53 2.65-.39 6.57 1.1 8.72.73 1.05 1.6 2.23 2.74 2.19 1.1-.04 1.52-.71 2.85-.71s1.71.71 2.87.69c1.19-.02 1.94-1.07 2.67-2.13.84-1.22 1.19-2.41 1.21-2.47-.03-.01-2.32-.89-2.34-3.52ZM14.2 6.16c.6-.74 1.01-1.76.9-2.77-.87.04-1.93.58-2.55 1.31-.56.64-1.05 1.69-.92 2.68.97.08 1.96-.49 2.57-1.22Z"/>
     </svg>
   );
 }

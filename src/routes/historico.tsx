@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireAuth } from "@/lib/auth-guard";
+import { useRequireAuth } from "@/lib/auth-guard";
 import { FileHeart, ChevronRight, Calendar } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { history } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/historico")({
-  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "Histórico — MediPet" },
@@ -17,6 +16,7 @@ export const Route = createFileRoute("/historico")({
 });
 
 function HistoryPage() {
+  useRequireAuth();
   return (
     <AppShell>
       <div className="space-y-6 px-4 py-6 lg:px-8 lg:py-8">

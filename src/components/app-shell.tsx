@@ -1,5 +1,4 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   History,
@@ -11,8 +10,8 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { getInitials, getSession, type Session } from "@/lib/storage";
-import { pet, tutor } from "@/lib/mock-data";
+import { getInitials } from "@/lib/storage";
+import { useAuth } from "@/lib/auth-context";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -24,22 +23,19 @@ const navItems = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [session, setSessionState] = useState<Session | null>(null);
+  const { perfil, pets } = useAuth();
 
-  useEffect(() => {
-    setSessionState(getSession());
-  }, [pathname]);
-
-  const displayName = session?.name ?? tutor.name;
-  const displayInitials = getInitials(displayName) || tutor.initials;
+  const displayName = perfil?.nome_completo || "Bem-vindo";
+  const displayInitials = getInitials(displayName) || "MP";
   const displaySubtitle =
-    session?.userType === "especialista"
+    perfil?.tipo_utilizador === "especialista"
       ? "Especialista · MediPet"
-      : `Tutora · ${pet.name}`;
+      : pets[0]?.nome
+        ? `Tutor(a) · ${pets[0].nome}`
+        : "Tutor(a)";
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-border bg-sidebar lg:flex">
         <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground">
@@ -75,9 +71,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
         <div className="border-t border-sidebar-border p-4">
           <div className="flex items-center gap-3 rounded-xl bg-accent/50 p-3">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-              {displayInitials}
-            </div>
+            {perfil?.avatar_url ? (
+              <img src={perfil.avatar_url} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+            ) : (
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                {displayInitials}
+              </div>
+            )}
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-sidebar-foreground">{displayName}</p>
               <p className="truncate text-xs text-muted-foreground">{displaySubtitle}</p>
@@ -86,9 +86,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      {/* Main */}
       <div className="lg:pl-64">
-        {/* Mobile header */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur lg:hidden">
           <div className="flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground">
@@ -105,7 +103,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="pb-24 lg:pb-12">{children}</main>
       </div>
 
-      {/* Mobile bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur lg:hidden">
         <div className="grid grid-cols-5">
           {navItems.map((item) => {

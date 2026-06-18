@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Search,
   FileHeart,
@@ -8,33 +8,31 @@ import {
   Star,
   MapPin,
   ChevronRight,
-  Heart,
   Shield,
   Activity,
   Stethoscope,
+  PawPrint,
+  Plus,
+  Pill,
 } from "lucide-react";
-import { requireAuth } from "@/lib/auth-guard";
-import { getSession, getSpecialistProfile, type Session, type SpecialistProfile } from "@/lib/storage";
+import { toast } from "sonner";
+import { useRequireAuth } from "@/lib/auth-guard";
+import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { activeStay, caregivers, tutor, pet } from "@/lib/mock-data";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { activeStay, caregivers, medications } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/")({
-  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "MediPet — Hospedagem técnica veterinária" },
-      {
-        name: "description",
-        content:
-          "Encontre especialistas verificados para hospedagem técnica de pets com necessidades clínicas.",
-      },
+      { name: "description", content: "Encontre especialistas verificados para hospedagem técnica de pets com necessidades clínicas." },
       { property: "og:title", content: "MediPet — Hospedagem técnica veterinária" },
-      {
-        property: "og:description",
-        content: "Cuidado clínico, monitoramento em tempo real e especialistas verificados.",
-      },
+      { property: "og:description", content: "Cuidado clínico, monitoramento em tempo real e especialistas verificados." },
     ],
   }),
   component: Dashboard,
@@ -48,35 +46,37 @@ const quickActions = [
 ];
 
 function Dashboard() {
+  useRequireAuth();
+  const { perfil, pets, isReady, refresh } = useAuth();
+
+  if (!isReady || !perfil) {
+    return (
+      <AppShell>
+        <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+          Carregando…
+        </div>
+      </AppShell>
+    );
+  }
+
+  const firstName = perfil.nome_completo.split(" ")[0] || "tutor(a)";
+  const isSpecialist = perfil.tipo_utilizador === "especialista";
+  const pet = pets[0];
   const progress = (activeStay.dayCurrent / activeStay.dayTotal) * 100;
-  const [session, setSessionState] = useState<Session | null>(null);
-  const [specialist, setSpecialist] = useState<SpecialistProfile | null>(null);
-
-  useEffect(() => {
-    const current = getSession();
-    setSessionState(current);
-    if (current?.userType === "especialista") {
-      setSpecialist(getSpecialistProfile());
-    }
-  }, []);
-
-  const firstName = (session?.name ?? tutor.name).split(" ")[0];
-  const isSpecialist = session?.userType === "especialista";
 
   return (
     <AppShell>
       <div className="grid gap-6 px-4 py-6 lg:grid-cols-[1fr_360px] lg:gap-8 lg:px-8 lg:py-8">
         <div className="space-y-6">
-          {/* Header */}
           <div>
             <p className="text-sm text-muted-foreground">Olá, {firstName} 👋</p>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              {isSpecialist ? "Seu painel profissional" : `Como o ${pet.name} está hoje?`}
+              {isSpecialist ? "Seu painel profissional" : pet ? `Como o ${pet.nome} está hoje?` : "Bem-vindo ao MediPet"}
             </h1>
           </div>
 
           {/* Specialist profile card */}
-          {isSpecialist && specialist && (
+          {isSpecialist && (
             <div className="overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-soft">
               <div className="flex items-start gap-4">
                 <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
@@ -84,21 +84,16 @@ function Dashboard() {
                 </div>
                 <div className="min-w-0 flex-1 space-y-2">
                   <div>
-                    <h2 className="text-xl font-bold">{specialist.name}</h2>
+                    <h2 className="text-xl font-bold">{perfil.nome_completo}</h2>
                     <p className="text-sm text-muted-foreground">
-                      CRMV-{specialist.uf} {specialist.crmv}
-                      {specialist.inst ? ` · ${specialist.inst}` : ""}
+                      CRMV-{perfil.uf ?? "—"} {perfil.crmv ?? ""}
+                      {perfil.instituicao ? ` · ${perfil.instituicao}` : ""}
                     </p>
                   </div>
-                  {specialist.bio && (
-                    <p className="text-sm leading-relaxed text-muted-foreground">{specialist.bio}</p>
-                  )}
+                  {perfil.bio && <p className="text-sm leading-relaxed text-muted-foreground">{perfil.bio}</p>}
                   <div className="flex flex-wrap gap-1.5">
-                    {specialist.specialties.map((s) => (
-                      <span
-                        key={s}
-                        className="rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground"
-                      >
+                    {perfil.especialidades.map((s: string) => (
+                      <span key={s} className="rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground">
                         {s}
                       </span>
                     ))}
@@ -108,69 +103,109 @@ function Dashboard() {
             </div>
           )}
 
-          {/* Active stay card */}
-          <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary to-primary-glow p-6 text-primary-foreground shadow-card">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 sm:flex sm:justify-between">
-              <div className="min-w-0 space-y-1">
-                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-primary-foreground/80">
-                  <span className="grid h-2 w-2 place-items-center rounded-full bg-white">
-                    <span className="h-2 w-2 animate-ping rounded-full bg-white/80" />
-                  </span>
-                  Hospedagem ativa
-                </div>
-                <h2 className="truncate text-xl font-bold sm:text-2xl">{activeStay.condition}</h2>
-                <p className="text-sm text-primary-foreground/85">
-                  com {activeStay.specialist}
-                </p>
-              </div>
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white/15 text-base font-bold backdrop-blur">
-                {activeStay.specialistInitials}
-              </div>
-            </div>
-            <div className="mt-6 space-y-2">
-              <div className="flex items-baseline justify-between">
-                <span className="text-xs font-medium text-primary-foreground/85">
-                  Dia {activeStay.dayCurrent} de {activeStay.dayTotal}
-                </span>
-                <span className="text-xs text-primary-foreground/75">
-                  Retorno: {activeStay.checkOut}
-                </span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
-                <div
-                  className="h-full rounded-full bg-white"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </div>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Link to="/monitoramento">
-                <Button variant="secondary" size="sm" className="bg-white text-primary hover:bg-white/90">
-                  <Activity className="mr-1.5 h-4 w-4" /> Monitorar
-                </Button>
-              </Link>
-              <Link to="/mensagens">
-                <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-white/15">
-                  <MessageSquare className="mr-1.5 h-4 w-4" /> Conversar
-                </Button>
-              </Link>
-            </div>
-          </div>
+          {/* Tutor — no pet yet */}
+          {!isSpecialist && !pet && <NoPetCard onCreated={refresh} />}
 
-          {/* Quick actions */}
+          {/* Tutor pet card with real data */}
+          {!isSpecialist && pet && (
+            <div className="overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-soft">
+              <div className="flex items-start gap-4">
+                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-accent text-accent-foreground">
+                  <PawPrint className="h-7 w-7" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xl font-bold">{pet.nome}</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {[pet.raca, pet.idade ? `${pet.idade} anos` : null, pet.peso ? `${pet.peso} kg` : null]
+                      .filter(Boolean).join(" · ") || "Sem detalhes"}
+                  </p>
+                  {pet.patologia_cronica && (
+                    <span className="mt-2 inline-block rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-medium text-destructive">
+                      {pet.patologia_cronica}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Active stay card */}
+          {!isSpecialist && pet && (
+            <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary to-primary-glow p-6 text-primary-foreground shadow-card">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 sm:flex sm:justify-between">
+                <div className="min-w-0 space-y-1">
+                  <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-primary-foreground/80">
+                    <span className="grid h-2 w-2 place-items-center rounded-full bg-white">
+                      <span className="h-2 w-2 animate-ping rounded-full bg-white/80" />
+                    </span>
+                    Hospedagem ativa
+                  </div>
+                  <h2 className="truncate text-xl font-bold sm:text-2xl">{pet.patologia_cronica ?? activeStay.condition}</h2>
+                  <p className="text-sm text-primary-foreground/85">com {activeStay.specialist}</p>
+                </div>
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white/15 text-base font-bold backdrop-blur">
+                  {activeStay.specialistInitials}
+                </div>
+              </div>
+              <div className="mt-6 space-y-2">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs font-medium text-primary-foreground/85">
+                    Dia {activeStay.dayCurrent} de {activeStay.dayTotal}
+                  </span>
+                  <span className="text-xs text-primary-foreground/75">Retorno: {activeStay.checkOut}</span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
+                  <div className="h-full rounded-full bg-white" style={{ width: `${progress}%` }} />
+                </div>
+              </div>
+              <div className="mt-6 flex flex-wrap gap-2">
+                <Link to="/monitoramento">
+                  <Button variant="secondary" size="sm" className="bg-white text-primary hover:bg-white/90">
+                    <Activity className="mr-1.5 h-4 w-4" /> Monitorar
+                  </Button>
+                </Link>
+                <Link to="/mensagens">
+                  <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-white/15">
+                    <MessageSquare className="mr-1.5 h-4 w-4" /> Conversar
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Medication routine */}
+          {!isSpecialist && pet && (
+            <div>
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                Rotina de medicamentos · hoje
+              </h3>
+              <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+                {medications.slice(0, 4).map((m, i) => (
+                  <div key={i} className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 p-4 ${i < 3 ? "border-b border-border" : ""}`}>
+                    <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${m.done ? "bg-primary/10 text-primary" : "bg-accent text-accent-foreground"}`}>
+                      <Pill className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">{m.name} · {m.dose}</p>
+                      <p className="text-xs text-muted-foreground">{m.time}</p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${m.done ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                      {m.done ? "Aplicado" : "Pendente"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Ações rápidas
-            </h3>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Ações rápidas</h3>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {quickActions.map((a) => {
                 const Icon = a.icon;
                 return (
-                  <Link
-                    key={a.label}
-                    to={a.to}
-                    className="group flex flex-col items-start gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-primary/40 hover:shadow-soft"
-                  >
+                  <Link key={a.label} to={a.to}
+                    className="group flex flex-col items-start gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-primary/40 hover:shadow-soft">
                     <div className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-accent-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
                       <Icon className="h-5 w-5" />
                     </div>
@@ -181,27 +216,18 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Featured caregivers */}
           <div>
             <div className="mb-3 flex items-end justify-between">
               <div>
                 <h3 className="text-lg font-bold tracking-tight">Cuidadores em destaque</h3>
                 <p className="text-sm text-muted-foreground">Especialistas verificados perto de você</p>
               </div>
-              <button className="hidden text-sm font-medium text-primary hover:underline sm:block">
-                Ver todos
-              </button>
             </div>
             <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 lg:mx-0 lg:px-0">
               {caregivers.map((c) => (
-                <article
-                  key={c.id}
-                  className="group w-64 shrink-0 overflow-hidden rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-card"
-                >
+                <article key={c.id} className="group w-64 shrink-0 overflow-hidden rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-card">
                   <div className="flex items-center gap-3">
-                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary/10 text-base font-bold text-primary">
-                      {c.initials}
-                    </div>
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary/10 text-base font-bold text-primary">{c.initials}</div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">{c.name}</p>
                       <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
@@ -213,22 +239,12 @@ function Dashboard() {
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1">
                     {c.specialties.map((s) => (
-                      <span
-                        key={s}
-                        className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground"
-                      >
-                        {s}
-                      </span>
+                      <span key={s} className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground">{s}</span>
                     ))}
                   </div>
                   <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="h-3 w-3" /> {c.distanceKm} km
-                    </span>
-                    <span className="text-sm font-bold text-foreground">
-                      R$ {c.pricePerDay}
-                      <span className="text-xs font-normal text-muted-foreground">/dia</span>
-                    </span>
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3" /> {c.distanceKm} km</span>
+                    <span className="text-sm font-bold text-foreground">R$ {c.pricePerDay}<span className="text-xs font-normal text-muted-foreground">/dia</span></span>
                   </div>
                 </article>
               ))}
@@ -236,23 +252,16 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Map panel (desktop only) */}
         <aside className="hidden lg:block">
           <div className="sticky top-8 space-y-4 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Cuidadores próximos</h3>
-              <span className="text-xs text-muted-foreground">{tutor.city}</span>
+              <span className="text-xs text-muted-foreground">São Paulo, SP</span>
             </div>
-            <MapMock />
             <div className="space-y-2">
               {caregivers.slice(0, 3).map((c) => (
-                <div
-                  key={c.id}
-                  className="flex items-center gap-3 rounded-xl border border-border p-2.5 transition-colors hover:bg-muted/40"
-                >
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                    {c.initials}
-                  </div>
+                <div key={c.id} className="flex items-center gap-3 rounded-xl border border-border p-2.5">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">{c.initials}</div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{c.name}</p>
                     <p className="text-xs text-muted-foreground">{c.distanceKm} km · R$ {c.pricePerDay}</p>
@@ -272,48 +281,62 @@ function Dashboard() {
   );
 }
 
-function MapMock() {
-  return (
-    <div className="relative h-56 w-full overflow-hidden rounded-xl bg-gradient-to-br from-emerald-50 to-sky-50">
-      {/* fake map grid */}
-      <svg className="absolute inset-0 h-full w-full text-emerald-200/60" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
-            <path d="M 32 0 L 0 0 0 32" fill="none" stroke="currentColor" strokeWidth="0.5" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" />
-        <path d="M 0 110 Q 100 70 200 130 T 400 100" stroke="oklch(0.7 0.08 200)" strokeWidth="3" fill="none" opacity="0.4" />
-        <path d="M 60 0 L 80 220" stroke="oklch(0.7 0.08 200)" strokeWidth="2.5" fill="none" opacity="0.35" />
-      </svg>
-      {/* Pins */}
-      <Pin x="22%" y="35%" label="AP" primary />
-      <Pin x="55%" y="55%" label="RM" />
-      <Pin x="72%" y="28%" label="JF" />
-      <Pin x="40%" y="75%" label="LP" />
-      {/* Self */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        <div className="grid h-4 w-4 place-items-center rounded-full bg-primary ring-4 ring-primary/30">
-          <div className="h-1.5 w-1.5 rounded-full bg-white" />
-        </div>
-      </div>
-    </div>
-  );
-}
+function NoPetCard({ onCreated }: { onCreated: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ nome: "", especie: "Cão", raca: "", idade: "", peso: "", patologia: "", alergias: "" });
+  const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
 
-function Pin({ x, y, label, primary }: { x: string; y: string; label: string; primary?: boolean }) {
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setSaving(true);
+    const { error } = await supabase.from("pets").insert({
+      tutor_id: user.id,
+      nome: form.nome,
+      especie: form.especie,
+      raca: form.raca || null,
+      idade: form.idade ? Number(form.idade) : null,
+      peso: form.peso ? Number(form.peso) : null,
+      patologia_cronica: form.patologia || null,
+      alergias: form.alergias ? form.alergias.split(",").map((s) => s.trim()).filter(Boolean) : [],
+    });
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Pet cadastrado!");
+    setOpen(false);
+    await onCreated();
+  };
+
   return (
-    <div className="absolute -translate-x-1/2 -translate-y-full" style={{ left: x, top: y }}>
-      <div
-        className={`grid h-8 w-8 place-items-center rounded-full text-[10px] font-bold shadow-card ${
-          primary ? "bg-primary text-primary-foreground" : "bg-card text-foreground border border-border"
-        }`}
-      >
-        {label}
+    <div className="rounded-2xl border-2 border-dashed border-border bg-card p-8 text-center">
+      <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-accent text-accent-foreground">
+        <PawPrint className="h-7 w-7" />
       </div>
-      <div
-        className={`mx-auto -mt-0.5 h-2 w-2 rotate-45 ${primary ? "bg-primary" : "bg-card border-r border-b border-border"}`}
-      />
+      <h2 className="mt-4 text-lg font-bold">Cadastre seu primeiro pet</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Para começar a usar o MediPet, registre as informações clínicas do seu pet.</p>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button className="mt-4"><Plus className="mr-1 h-4 w-4" /> Adicionar pet</Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Novo pet</DialogTitle></DialogHeader>
+          <form onSubmit={submit} className="space-y-3">
+            <div><Label>Nome</Label><Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Espécie</Label><Input value={form.especie} onChange={(e) => setForm({ ...form, especie: e.target.value })} /></div>
+              <div><Label>Raça</Label><Input value={form.raca} onChange={(e) => setForm({ ...form, raca: e.target.value })} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Idade (anos)</Label><Input type="number" value={form.idade} onChange={(e) => setForm({ ...form, idade: e.target.value })} /></div>
+              <div><Label>Peso (kg)</Label><Input type="number" step="0.1" value={form.peso} onChange={(e) => setForm({ ...form, peso: e.target.value })} /></div>
+            </div>
+            <div><Label>Patologia crônica</Label><Input placeholder="Ex.: Insulinoma" value={form.patologia} onChange={(e) => setForm({ ...form, patologia: e.target.value })} /></div>
+            <div><Label>Alergias (separe por vírgula)</Label><Input placeholder="Frango, corantes" value={form.alergias} onChange={(e) => setForm({ ...form, alergias: e.target.value })} /></div>
+            <Button type="submit" className="w-full" disabled={saving}>{saving ? "Salvando…" : "Salvar pet"}</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

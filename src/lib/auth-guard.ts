@@ -1,14 +1,26 @@
-import { redirect } from "@tanstack/react-router";
-import { getSession } from "@/lib/storage";
+import { useEffect } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useAuth } from "@/lib/auth-context";
 
-export function requireAuth() {
-  if (typeof window !== "undefined" && !getSession()) {
-    throw redirect({ to: "/login" });
-  }
+/** Client-side guard: redirects to /login when ready and no user. */
+export function useRequireAuth() {
+  const { user, isReady } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (isReady && !user) {
+      navigate({ to: "/login" });
+    }
+  }, [isReady, user, navigate]);
+  return { user, isReady };
 }
 
-export function redirectIfAuthenticated() {
-  if (typeof window !== "undefined" && getSession()) {
-    throw redirect({ to: "/" });
-  }
+/** Client-side guard: redirects to / if user is already authenticated. */
+export function useRedirectIfAuthenticated() {
+  const { user, isReady } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (isReady && user) {
+      navigate({ to: "/" });
+    }
+  }, [isReady, user, navigate]);
 }

@@ -1,14 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { PawPrint, Bell, Shield, CreditCard, HelpCircle, LogOut, ChevronRight, Pencil, Stethoscope } from "lucide-react";
+import { useRef, useState } from "react";
+import { PawPrint, Bell, Shield, CreditCard, HelpCircle, LogOut, ChevronRight, Camera, Stethoscope } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
-import { tutor, pet } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
-import { requireAuth } from "@/lib/auth-guard";
-import { getInitials, getSession, getSpecialistProfile, logout, type Session, type SpecialistProfile } from "@/lib/storage";
+import { useRequireAuth } from "@/lib/auth-guard";
+import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/integrations/supabase/client";
+import { getInitials } from "@/lib/storage";
 
 export const Route = createFileRoute("/perfil")({
-  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "Perfil — MediPet" },
@@ -26,76 +27,95 @@ const menu = [
 ];
 
 function ProfilePage() {
+  useRequireAuth();
   const navigate = useNavigate();
-  const [session, setSessionState] = useState<Session | null>(null);
-  const [specialist, setSpecialist] = useState<SpecialistProfile | null>(null);
+  const { perfil, pets, user, refresh, signOut } = useAuth();
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const current = getSession();
-    setSessionState(current);
-    if (current?.userType === "especialista") {
-      setSpecialist(getSpecialistProfile());
+  if (!perfil || !user) {
+    return <AppShell><div className="flex h-64 items-center justify-center text-sm text-muted-foreground">Carregando…</div></AppShell>;
+  }
+
+  const isSpecialist = perfil.tipo_utilizador === "especialista";
+  const displayName = perfil.nome_completo || "Usuário";
+  const displayInitials = getInitials(displayName) || "MP";
+
+  const handleAvatar = async (file: File) => {
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/avatar.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("medipet-uploads")
+        .upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: signed } = await supabase.storage
+        .from("medipet-uploads")
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      const url = signed?.signedUrl;
+      if (!url) throw new Error("URL inválida");
+      const { error } = await supabase.from("perfis").update({ avatar_url: url }).eq("id", user.id);
+      if (error) throw error;
+      await refresh();
+      toast.success("Foto atualizada!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha no upload.");
+    } finally {
+      setUploading(false);
     }
-  }, []);
-
-  const handleLogout = () => {
-    logout();
-    navigate({ to: "/login" });
   };
 
-  const displayName = specialist?.name ?? session?.name ?? tutor.name;
-  const displayInitials = getInitials(displayName) || tutor.initials;
-  const displayRole =
-    session?.userType === "especialista"
-      ? `Especialista · CRMV-${specialist?.uf || "—"} ${specialist?.crmv || ""}`
-      : `Tutora · ${tutor.city}`;
+  const handleLogout = async () => {
+    await signOut();
+    navigate({ to: "/login" });
+  };
 
   return (
     <AppShell>
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 lg:px-8 lg:py-8">
-        {/* Header */}
         <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary to-primary-glow p-6 text-primary-foreground shadow-card">
           <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4">
-            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-white/15 text-xl font-bold backdrop-blur">
-              {displayInitials}
+            <div className="relative">
+              {perfil.avatar_url ? (
+                <img src={perfil.avatar_url} alt="" className="h-16 w-16 rounded-full object-cover ring-2 ring-white/30" />
+              ) : (
+                <div className="grid h-16 w-16 place-items-center rounded-full bg-white/15 text-xl font-bold backdrop-blur">
+                  {displayInitials}
+                </div>
+              )}
+              <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-white text-primary shadow disabled:opacity-60">
+                <Camera className="h-3.5 w-3.5" />
+              </button>
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png" hidden
+                onChange={(e) => e.target.files?.[0] && handleAvatar(e.target.files[0])} />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-xl font-bold">{displayName}</h1>
-              <p className="truncate text-sm text-primary-foreground/85">{displayRole}</p>
+              <p className="truncate text-sm text-primary-foreground/85">
+                {isSpecialist ? `Especialista · CRMV-${perfil.uf ?? "—"} ${perfil.crmv ?? ""}` : "Tutor(a)"}
+              </p>
             </div>
-            <Button variant="secondary" size="sm" className="bg-white/15 text-white hover:bg-white/25">
-              <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar
-            </Button>
+            <span className="text-xs text-primary-foreground/70">{perfil.email}</span>
           </div>
         </div>
 
-        {/* Specialist professional info */}
-        {session?.userType === "especialista" && specialist && (
+        {isSpecialist && (
           <section>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Perfil profissional
-            </h2>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Perfil profissional</h2>
             <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-soft">
-              {specialist.bio && (
-                <p className="text-sm leading-relaxed text-muted-foreground">{specialist.bio}</p>
-              )}
+              {perfil.bio && <p className="text-sm leading-relaxed text-muted-foreground">{perfil.bio}</p>}
               <div className="grid gap-3 sm:grid-cols-2">
-                <InfoItem label="CRMV" value={`${specialist.uf}-${specialist.crmv}`} />
-                {specialist.matricula && (
-                  <InfoItem label="Matrícula" value={specialist.matricula} />
-                )}
-                {specialist.inst && <InfoItem label="Instituição" value={specialist.inst} />}
-                <InfoItem label="E-mail" value={specialist.email} />
+                <InfoItem label="CRMV" value={`${perfil.uf ?? "—"}-${perfil.crmv ?? "—"}`} />
+                {perfil.matricula && <InfoItem label="Matrícula" value={perfil.matricula} />}
+                {perfil.instituicao && <InfoItem label="Instituição" value={perfil.instituicao} />}
+                <InfoItem label="E-mail" value={perfil.email ?? "—"} />
               </div>
-              {specialist.specialties.length > 0 && (
+              {perfil.especialidades.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  {specialist.specialties.map((s) => (
-                    <span
-                      key={s}
-                      className="rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground"
-                    >
-                      {s}
-                    </span>
+                  {perfil.especialidades.map((s: string) => (
+                    <span key={s} className="rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground">{s}</span>
                   ))}
                 </div>
               )}
@@ -103,71 +123,60 @@ function ProfilePage() {
           </section>
         )}
 
-        {/* Pet card — tutors only */}
-        {session?.userType !== "especialista" && (
+        {!isSpecialist && pets.length > 0 && (
           <section>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Meus pets
-            </h2>
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4">
-                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-accent text-accent-foreground">
-                  <PawPrint className="h-6 w-6" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="truncate text-base font-bold">{pet.name}</h3>
-                  <p className="truncate text-sm text-muted-foreground">
-                    {pet.breed} · {pet.age} · {pet.weight}
-                  </p>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
-                      {pet.condition}
-                    </span>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Meus pets</h2>
+            <div className="space-y-3">
+              {pets.map((pet) => (
+                <div key={pet.id} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+                  <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4">
+                    <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-accent text-accent-foreground">
+                      <PawPrint className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-base font-bold">{pet.nome}</h3>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {[pet.raca, pet.idade ? `${pet.idade} anos` : null, pet.peso ? `${pet.peso} kg` : null].filter(Boolean).join(" · ") || "—"}
+                      </p>
+                      {pet.patologia_cronica && (
+                        <span className="mt-1.5 inline-block rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
+                          {pet.patologia_cronica}
+                        </span>
+                      )}
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
+              ))}
             </div>
           </section>
         )}
 
-        {/* Specialist quick stats */}
-        {session?.userType === "especialista" && specialist && (
+        {isSpecialist && perfil.documentos.length > 0 && (
           <section>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Documentos enviados
-            </h2>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Documentos enviados</h2>
             <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
               <div className="flex items-center gap-3">
                 <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground">
                   <Stethoscope className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">{specialist.documents.length} documentos verificados</p>
-                  <p className="text-xs text-muted-foreground">
-                    {specialist.documents.map((d) => d.name).join(", ")}
-                  </p>
+                  <p className="text-sm font-semibold">{perfil.documentos.length} documentos enviados</p>
+                  <p className="text-xs text-muted-foreground">{perfil.documentos.map((d) => d.name).join(", ")}</p>
                 </div>
               </div>
             </div>
           </section>
         )}
 
-        {/* Menu */}
         <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Conta
-          </h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Conta</h2>
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
             {menu.map((m, i) => {
               const Icon = m.icon;
               return (
-                <button
-                  key={m.label}
-                  className={`grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 p-4 text-left transition-colors hover:bg-muted/40 ${
-                    i < menu.length - 1 ? "border-b border-border" : ""
-                  }`}
-                >
+                <button key={m.label}
+                  className={`grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 p-4 text-left transition-colors hover:bg-muted/40 ${i < menu.length - 1 ? "border-b border-border" : ""}`}>
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground">
                     <Icon className="h-4.5 w-4.5" />
                   </div>
@@ -182,11 +191,8 @@ function ProfilePage() {
           </div>
         </section>
 
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card p-4 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/5"
-        >
+        <button type="button" onClick={handleLogout}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card p-4 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/5">
           <LogOut className="h-4 w-4" /> Sair da conta
         </button>
 
