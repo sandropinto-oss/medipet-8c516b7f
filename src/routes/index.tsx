@@ -20,11 +20,21 @@ import { useRequireAuth } from "@/lib/auth-guard";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
+import { SpecialistsMap, type MapSpecialist } from "@/components/specialists-map";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { activeStay, caregivers, medications } from "@/lib/mock-data";
+
+interface SpecialistRow {
+  id: string;
+  nome_completo: string;
+  especialidades: string[];
+  latitude: number | null;
+  longitude: number | null;
+  preco_diaria: number | null;
+}
 
 export const Route = createFileRoute("/")({
   head: () => ({
