@@ -80,7 +80,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
-        <div className="border-t border-sidebar-border p-4">
+        <div className="space-y-2 border-t border-sidebar-border p-4">
           <div className="flex items-center gap-3 rounded-xl bg-accent/50 p-3">
             {perfil?.avatar_url ? (
               <img src={perfil.avatar_url} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
@@ -94,6 +94,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               <p className="truncate text-xs text-muted-foreground">{displaySubtitle}</p>
             </div>
           </div>
+          <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-muted-foreground" onClick={handleSignOut}>
+            <LogOut className="h-4 w-4" /> Sair
+          </Button>
         </div>
       </aside>
 
