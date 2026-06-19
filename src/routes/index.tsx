@@ -360,18 +360,20 @@ function Dashboard() {
               <h3 className="text-sm font-semibold">Cuidadores próximos</h3>
               <Link to="/buscar" className="text-xs text-muted-foreground hover:text-primary">Ver todos</Link>
             </div>
-            {specialists.length === 0 ? (
+            {sortedSpecialists.length === 0 ? (
               <p className="text-xs text-muted-foreground">Nenhum especialista cadastrado ainda.</p>
             ) : (
               <div className="space-y-2">
-                {specialists.slice(0, 3).map((c) => (
+                {sortedSpecialists.slice(0, 3).map((c) => (
                   <Link key={c.id} to="/buscar" className="flex items-center gap-3 rounded-xl border border-border p-2.5 hover:border-primary/40">
                     <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                       {getInitials(c.nome_completo) || "MP"}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{c.nome_completo}</p>
-                      <p className="truncate text-xs text-muted-foreground">{c.especialidades?.[0] ?? "Especialista"}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {c.distanceKm != null ? `${c.distanceKm.toFixed(1)} km · ` : ""}{c.especialidades?.[0] ?? "Especialista"}
+                      </p>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </Link>
