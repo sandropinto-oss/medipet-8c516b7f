@@ -451,22 +451,24 @@ function EditProfileDialog({ perfil, isSpecialist }: { perfil: Perfil; isSpecial
     if (!user) return;
     if (!form.nome.trim()) { toast.error("Informe seu nome."); return; }
     setSaving(true);
-    const base: Record<string, unknown> = {
+    const base = {
       nome_completo: form.nome.trim(),
       bio: form.bio.trim() || null,
+      ...(isSpecialist
+        ? {
+            uf: form.uf.trim() || null,
+            crmv: form.crmv.trim() || null,
+            matricula: form.matricula.trim() || null,
+            instituicao: form.instituicao.trim() || null,
+            especialidades: form.especialidades
+              ? form.especialidades.split(",").map((s) => s.trim()).filter(Boolean)
+              : [],
+            preco_diaria: form.preco ? Number(form.preco) : null,
+            latitude: form.latitude ? Number(form.latitude) : null,
+            longitude: form.longitude ? Number(form.longitude) : null,
+          }
+        : {}),
     };
-    if (isSpecialist) {
-      base.uf = form.uf.trim() || null;
-      base.crmv = form.crmv.trim() || null;
-      base.matricula = form.matricula.trim() || null;
-      base.instituicao = form.instituicao.trim() || null;
-      base.especialidades = form.especialidades
-        ? form.especialidades.split(",").map((s) => s.trim()).filter(Boolean)
-        : [];
-      base.preco_diaria = form.preco ? Number(form.preco) : null;
-      base.latitude = form.latitude ? Number(form.latitude) : null;
-      base.longitude = form.longitude ? Number(form.longitude) : null;
-    }
     const { error } = await supabase.from("perfis").update(base).eq("id", user.id);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
