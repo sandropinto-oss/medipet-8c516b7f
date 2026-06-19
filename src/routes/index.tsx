@@ -360,13 +360,10 @@ function NearbyMap() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("perfis")
-        .select("id, nome_completo, especialidades, latitude, longitude, preco_diaria")
-        .eq("tipo_utilizador", "especialista")
-        .not("latitude", "is", null)
-        .not("longitude", "is", null);
-      const rows = (data as SpecialistRow[] | null) ?? [];
+      const { data } = await supabase.rpc("get_especialistas_publicos");
+      const rows = ((data as SpecialistRow[] | null) ?? []).filter(
+        (s) => s.latitude != null && s.longitude != null,
+      );
       setMarkers(
         rows.map((s) => ({
           id: s.id,
