@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   History,
@@ -7,16 +7,20 @@ import {
   User,
   Stethoscope,
   Bell,
+  LogOut,
+  Search,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getInitials } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
+import { Button } from "@/components/ui/button";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/buscar", label: "Buscar", icon: Search },
   { to: "/historico", label: "Histórico", icon: History },
-  { to: "/monitoramento", label: "Monitoramento", icon: Activity },
   { to: "/mensagens", label: "Mensagens", icon: MessageSquare },
   { to: "/perfil", label: "Perfil", icon: User },
 ] as const;
