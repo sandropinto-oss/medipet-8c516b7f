@@ -68,6 +68,40 @@ function MonitoringPage() {
           </p>
         </div>
 
+        {stay && (
+          <div className="overflow-hidden rounded-2xl border border-primary/30 bg-card shadow-card">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-primary/5 px-5 py-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                <Home className="h-4 w-4" />
+                Casa de {stay.especialista_nome} · ao vivo 24h
+              </div>
+              <Link to="/mensagens" className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1">
+                <MessageSquare className="h-3.5 w-3.5" /> Falar com o especialista
+              </Link>
+            </div>
+            <div className="h-[320px]">
+              <SpecialistsMap
+                specialists={[{
+                  id: stay.especialista_id,
+                  name: stay.especialista_nome,
+                  latitude: stay.especialista_latitude,
+                  longitude: stay.especialista_longitude,
+                } satisfies MapSpecialist]}
+                mode="stay"
+                className="h-full w-full"
+                center={{ lat: stay.especialista_latitude, lng: stay.especialista_longitude }}
+                zoom={15}
+              />
+            </div>
+            {stay.data_inicio && stay.data_fim && (
+              <div className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
+                Hospedagem: {new Date(stay.data_inicio).toLocaleDateString("pt-BR")} – {new Date(stay.data_fim).toLocaleDateString("pt-BR")}
+              </div>
+            )}
+          </div>
+        )}
+
+
         {pet ? (
           <div className="overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-soft">
             <div className="flex flex-wrap items-center gap-4">
