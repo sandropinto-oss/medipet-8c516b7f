@@ -39,9 +39,9 @@ export const Route = createFileRoute("/")({
 });
 
 const quickActions = [
-  { label: "Buscar cuidador", icon: Search, to: "/" as const },
+  { label: "Buscar cuidador", icon: Search, to: "/buscar" as const },
   { label: "Histórico clínico", icon: FileHeart, to: "/historico" as const },
-  { label: "Nova reserva", icon: CalendarPlus, to: "/" as const },
+  { label: "Nova reserva", icon: CalendarPlus, to: "/buscar" as const },
   { label: "Mensagens", icon: MessageSquare, to: "/mensagens" as const },
 ];
 
