@@ -208,6 +208,10 @@ function Dashboard() {
             </div>
           )}
 
+          {!isSpecialist && <NearbyMap />}
+
+
+
           <div>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Ações rápidas</h3>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
