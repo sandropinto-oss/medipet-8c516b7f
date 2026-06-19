@@ -354,3 +354,44 @@ function NoPetCard({ onCreated }: { onCreated: () => Promise<void> }) {
     </div>
   );
 }
+
+function NearbyMap() {
+  const [markers, setMarkers] = useState<MapSpecialist[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("perfis")
+        .select("id, nome_completo, especialidades, latitude, longitude, preco_diaria")
+        .eq("tipo_utilizador", "especialista")
+        .not("latitude", "is", null)
+        .not("longitude", "is", null);
+      const rows = (data as SpecialistRow[] | null) ?? [];
+      setMarkers(
+        rows.map((s) => ({
+          id: s.id,
+          name: s.nome_completo,
+          latitude: s.latitude!,
+          longitude: s.longitude!,
+          specialty: s.especialidades?.[0] ?? null,
+          pricePerDay: s.preco_diaria,
+        })),
+      );
+    })();
+  }, []);
+
+  return (
+    <div>
+      <div className="mb-3 flex items-end justify-between">
+        <div>
+          <h3 className="text-lg font-bold tracking-tight">Cuidadores no mapa</h3>
+          <p className="text-sm text-muted-foreground">Especialistas geolocalizados próximos a você</p>
+        </div>
+        <Link to="/buscar"><Button variant="ghost" size="sm">Ver todos</Button></Link>
+      </div>
+      <div className="h-[280px] overflow-hidden rounded-2xl border border-border shadow-soft">
+        <SpecialistsMap specialists={markers} className="h-full w-full" />
+      </div>
+    </div>
+  );
+}
