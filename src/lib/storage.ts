@@ -1,4 +1,4 @@
-import { medications as defaultMedications } from "@/lib/mock-data";
+const defaultMedications: MedicationTask[] = [];
 
 const ONBOARDING_KEY = "medipet_onboarding";
 
