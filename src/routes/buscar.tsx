@@ -93,9 +93,7 @@ function BuscarPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{s.nome_completo}</p>
-                    <p className="text-xs text-muted-foreground">
-                      CRMV-{s.uf ?? "—"} {s.crmv ?? ""}
-                    </p>
+                    {s.bio && <p className="line-clamp-2 text-xs text-muted-foreground">{s.bio}</p>}
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                       <Star className="h-3 w-3 fill-warning text-warning" />
                       <span>4.9 (124)</span>
