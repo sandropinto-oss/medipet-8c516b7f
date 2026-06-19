@@ -291,7 +291,9 @@ function Dashboard() {
             </div>
           )}
 
-          {!isSpecialist && <NearbyMap specialists={specialists} />}
+          {!isSpecialist && activeStay && <ActiveStayMap stay={activeStay} />}
+
+          {!isSpecialist && !activeStay && <NearbyMap specialists={sortedSpecialists.slice(0, 30)} userLocation={userLoc} />}
 
           <div>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Ações rápidas</h3>
