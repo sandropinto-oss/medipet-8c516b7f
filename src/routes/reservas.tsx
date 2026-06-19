@@ -20,17 +20,18 @@ export const Route = createFileRoute("/reservas")({
 
 interface BookingRow {
   id: string;
+  tutor_id: string;
+  especialista_id: string;
   status: string;
   data_inicio: string | null;
   data_fim: string | null;
-  especialista: { nome_completo: string } | null;
-  tutor: { nome_completo: string } | null;
 }
 
 function ReservasPage() {
   useRequireAuth();
   const { user, perfil } = useAuth();
   const [rows, setRows] = useState<BookingRow[]>([]);
+  const [names, setNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,10 +39,24 @@ function ReservasPage() {
     (async () => {
       const { data, error } = await supabase
         .from("bookings")
-        .select("id, status, data_inicio, data_fim, especialista:especialista_id(nome_completo), tutor:tutor_id(nome_completo)")
+        .select("id, tutor_id, especialista_id, status, data_inicio, data_fim")
         .order("created_at", { ascending: false });
       if (error) toast.error(error.message);
-      setRows((data as unknown as BookingRow[] | null) ?? []);
+      const list = (data as BookingRow[] | null) ?? [];
+      setRows(list);
+
+      const counterIds = Array.from(
+        new Set(list.map((r) => (r.tutor_id === user.id ? r.especialista_id : r.tutor_id))),
+      );
+      const map: Record<string, string> = {};
+      await Promise.all(
+        counterIds.map(async (id) => {
+          const { data: p } = await supabase.rpc("get_perfil_publico", { _id: id });
+          const row = (p as { nome_completo: string }[] | null)?.[0];
+          if (row) map[id] = row.nome_completo;
+        }),
+      );
+      setNames(map);
       setLoading(false);
     })();
   }, [user]);
@@ -78,19 +93,20 @@ function ReservasPage() {
               )}
             </div>
           ) : (
-            rows.map((r, i) => (
-              <div key={r.id} className={`grid grid-cols-[1fr_auto] gap-4 p-4 ${i < rows.length - 1 ? "border-b border-border" : ""}`}>
-                <div>
-                  <p className="text-sm font-semibold">
-                    {isSpecialist ? r.tutor?.nome_completo : r.especialista?.nome_completo}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {r.data_inicio ? `${r.data_inicio} → ${r.data_fim ?? "?"}` : "Datas a definir"}
-                  </p>
+            rows.map((r, i) => {
+              const counterId = r.tutor_id === user?.id ? r.especialista_id : r.tutor_id;
+              return (
+                <div key={r.id} className={`grid grid-cols-[1fr_auto] gap-4 p-4 ${i < rows.length - 1 ? "border-b border-border" : ""}`}>
+                  <div>
+                    <p className="text-sm font-semibold">{names[counterId] ?? "—"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {r.data_inicio ? `${r.data_inicio} → ${r.data_fim ?? "?"}` : "Datas a definir"}
+                    </p>
+                  </div>
+                  <StatusBadge status={r.status} />
                 </div>
-                <StatusBadge status={r.status} />
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

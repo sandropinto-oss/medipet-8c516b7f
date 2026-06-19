@@ -193,7 +193,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_especialistas_publicos: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          bio: string
+          especialidades: string[]
+          id: string
+          latitude: number
+          longitude: number
+          nome_completo: string
+          preco_diaria: number
+        }[]
+      }
+      get_perfil_publico: {
+        Args: { _id: string }
+        Returns: {
+          avatar_url: string
+          id: string
+          nome_completo: string
+        }[]
+      }
     }
     Enums: {
       booking_status:
