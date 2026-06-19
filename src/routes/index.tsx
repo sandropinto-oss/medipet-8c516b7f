@@ -313,7 +313,7 @@ function Dashboard() {
             </div>
           </div>
 
-          {!isSpecialist && specialists.length > 0 && (
+          {!isSpecialist && sortedSpecialists.length > 0 && (
             <div>
               <div className="mb-3 flex items-end justify-between">
                 <div>
@@ -323,7 +323,7 @@ function Dashboard() {
                 <Link to="/buscar"><Button variant="ghost" size="sm">Ver todos</Button></Link>
               </div>
               <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 lg:mx-0 lg:px-0">
-                {specialists.map((c) => (
+                {sortedSpecialists.slice(0, 8).map((c) => (
                   <article key={c.id} className="group w-64 shrink-0 overflow-hidden rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-card">
                     <div className="flex items-center gap-3">
                       <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary/10 text-base font-bold text-primary">
