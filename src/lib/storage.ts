@@ -1,4 +1,4 @@
-import { medications as defaultMedications } from "@/lib/mock-data";
+// Default empty list — medications come from user routine, not seed data.
 
 const ONBOARDING_KEY = "medipet_onboarding";
 
@@ -89,8 +89,7 @@ function medicationKey() {
 
 export function getMedicationTasks(): MedicationTask[] {
   const stored = readJson<MedicationTask[] | null>(medicationKey(), null);
-  if (stored) return stored;
-  return defaultMedications.map((m) => ({ ...m }));
+  return stored ?? [];
 }
 
 export function saveMedicationTasks(tasks: MedicationTask[]) {

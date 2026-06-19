@@ -1,9 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
-import { PawPrint, Bell, Shield, CreditCard, HelpCircle, LogOut, ChevronRight, Camera, Stethoscope } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { PawPrint, Bell, Shield, CreditCard, HelpCircle, LogOut, ChevronRight, Camera, Stethoscope, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { useRequireAuth } from "@/lib/auth-guard";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,13 +22,6 @@ export const Route = createFileRoute("/perfil")({
   }),
   component: ProfilePage,
 });
-
-const menu = [
-  { icon: Bell, label: "Notificações", desc: "Avisos clínicos e mensagens" },
-  { icon: Shield, label: "Privacidade e segurança", desc: "Senha e autenticação" },
-  { icon: CreditCard, label: "Pagamentos", desc: "Cartões e histórico" },
-  { icon: HelpCircle, label: "Ajuda e suporte", desc: "FAQ, contato e termos" },
-];
 
 function ProfilePage() {
   useRequireAuth();
@@ -68,6 +65,7 @@ function ProfilePage() {
 
   const handleLogout = async () => {
     await signOut();
+    toast.success("Sessão encerrada.");
     navigate({ to: "/login" });
   };
 
@@ -84,7 +82,7 @@ function ProfilePage() {
                   {displayInitials}
                 </div>
               )}
-              <button onClick={() => fileRef.current?.click()} disabled={uploading}
+              <button onClick={() => fileRef.current?.click()} disabled={uploading} type="button"
                 className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-white text-primary shadow disabled:opacity-60">
                 <Camera className="h-3.5 w-3.5" />
               </button>
@@ -96,16 +94,21 @@ function ProfilePage() {
               <p className="truncate text-sm text-primary-foreground/85">
                 {isSpecialist ? `Especialista · CRMV-${perfil.uf ?? "—"} ${perfil.crmv ?? ""}` : "Tutor(a)"}
               </p>
+              {perfil.email && <p className="truncate text-xs text-primary-foreground/70">{perfil.email}</p>}
             </div>
-            <span className="text-xs text-primary-foreground/70">{perfil.email}</span>
+            <EditProfileDialog />
           </div>
         </div>
 
-        {isSpecialist && (
+        {isSpecialist && (perfil.bio || perfil.crmv || perfil.especialidades.length > 0) && (
           <section>
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Perfil profissional</h2>
             <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-soft">
-              {perfil.bio && <p className="text-sm leading-relaxed text-muted-foreground">{perfil.bio}</p>}
+              {perfil.bio ? (
+                <p className="text-sm leading-relaxed text-muted-foreground">{perfil.bio}</p>
+              ) : (
+                <p className="text-sm italic text-muted-foreground">Adicione uma bio profissional editando seu perfil.</p>
+              )}
               <div className="grid gap-3 sm:grid-cols-2">
                 <InfoItem label="CRMV" value={`${perfil.uf ?? "—"}-${perfil.crmv ?? "—"}`} />
                 {perfil.matricula && <InfoItem label="Matrícula" value={perfil.matricula} />}
@@ -123,32 +126,43 @@ function ProfilePage() {
           </section>
         )}
 
-        {!isSpecialist && pets.length > 0 && (
+        {!isSpecialist && (
           <section>
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Meus pets</h2>
-            <div className="space-y-3">
-              {pets.map((pet) => (
-                <div key={pet.id} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-                  <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4">
-                    <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-accent text-accent-foreground">
-                      <PawPrint className="h-6 w-6" />
+            {pets.length === 0 ? (
+              <div className="rounded-2xl border-2 border-dashed border-border bg-card p-8 text-center">
+                <PawPrint className="mx-auto h-8 w-8 text-muted-foreground" />
+                <p className="mt-3 text-sm font-semibold">Nenhum pet cadastrado</p>
+                <p className="mt-1 text-xs text-muted-foreground">Cadastre seu primeiro pet pelo painel inicial.</p>
+                <Button onClick={() => navigate({ to: "/" })} variant="outline" size="sm" className="mt-4">
+                  Ir ao painel
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pets.map((pet) => (
+                  <div key={pet.id} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+                    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4">
+                      <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-accent text-accent-foreground">
+                        <PawPrint className="h-6 w-6" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="truncate text-base font-bold">{pet.nome}</h3>
+                        <p className="truncate text-sm text-muted-foreground">
+                          {[pet.raca, pet.idade ? `${pet.idade} anos` : null, pet.peso ? `${pet.peso} kg` : null].filter(Boolean).join(" · ") || "—"}
+                        </p>
+                        {pet.patologia_cronica && (
+                          <span className="mt-1.5 inline-block rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
+                            {pet.patologia_cronica}
+                          </span>
+                        )}
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="truncate text-base font-bold">{pet.nome}</h3>
-                      <p className="truncate text-sm text-muted-foreground">
-                        {[pet.raca, pet.idade ? `${pet.idade} anos` : null, pet.peso ? `${pet.peso} kg` : null].filter(Boolean).join(" · ") || "—"}
-                      </p>
-                      {pet.patologia_cronica && (
-                        <span className="mt-1.5 inline-block rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
-                          {pet.patologia_cronica}
-                        </span>
-                      )}
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
 
@@ -172,22 +186,14 @@ function ProfilePage() {
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Conta</h2>
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
-            {menu.map((m, i) => {
-              const Icon = m.icon;
-              return (
-                <button key={m.label}
-                  className={`grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 p-4 text-left transition-colors hover:bg-muted/40 ${i < menu.length - 1 ? "border-b border-border" : ""}`}>
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground">
-                    <Icon className="h-4.5 w-4.5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{m.label}</p>
-                    <p className="truncate text-xs text-muted-foreground">{m.desc}</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </button>
-              );
-            })}
+            <MenuRow icon={Bell} label="Notificações" desc="Avisos clínicos e mensagens"
+              onClick={() => toast.info("Configurações de notificações em breve.")} />
+            <MenuRow icon={Shield} label="Privacidade e segurança" desc="Senha e autenticação"
+              onClick={() => toast.info("Use o link de redefinição enviado para o seu e-mail para alterar a senha.")} />
+            <MenuRow icon={CreditCard} label="Pagamentos" desc="Cartões e histórico"
+              onClick={() => toast.info("Integração de pagamentos em breve.")} />
+            <MenuRow icon={HelpCircle} label="Ajuda e suporte" desc="FAQ, contato e termos" last
+              onClick={() => window.open("mailto:suporte@medipet.app?subject=Ajuda%20MediPet", "_blank")} />
           </div>
         </section>
 
@@ -199,6 +205,78 @@ function ProfilePage() {
         <p className="text-center text-[11px] text-muted-foreground">MediPet · v1.0.0</p>
       </div>
     </AppShell>
+  );
+}
+
+function MenuRow({ icon: Icon, label, desc, onClick, last }: { icon: typeof Bell; label: string; desc: string; onClick: () => void; last?: boolean }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 p-4 text-left transition-colors hover:bg-muted/40 ${last ? "" : "border-b border-border"}`}>
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground">
+        <Icon className="h-4.5 w-4.5" />
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold">{label}</p>
+        <p className="truncate text-xs text-muted-foreground">{desc}</p>
+      </div>
+      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+    </button>
+  );
+}
+
+function EditProfileDialog() {
+  const { perfil, user, refresh } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [nome, setNome] = useState("");
+  const [bio, setBio] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open && perfil) {
+      setNome(perfil.nome_completo);
+      setBio(perfil.bio ?? "");
+    }
+  }, [open, perfil]);
+
+  const save = async () => {
+    if (!user) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("perfis")
+      .update({ nome_completo: nome.trim(), bio: bio.trim() || null })
+      .eq("id", user.id);
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Perfil atualizado!");
+    await refresh();
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button type="button" size="sm" variant="secondary" className="bg-white/15 text-primary-foreground hover:bg-white/25">
+          <Pencil className="mr-1 h-3.5 w-3.5" /> Editar
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Editar perfil</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Nome completo</Label>
+            <Input value={nome} onChange={(e) => setNome(e.target.value)} />
+          </div>
+          <div>
+            <Label>Bio</Label>
+            <Textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} placeholder="Conte um pouco sobre você…" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button onClick={save} disabled={saving || !nome.trim()}>{saving ? "Salvando…" : "Salvar"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

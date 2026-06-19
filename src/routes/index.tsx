@@ -5,7 +5,6 @@ import {
   FileHeart,
   CalendarPlus,
   MessageSquare,
-  Star,
   MapPin,
   ChevronRight,
   Shield,
@@ -13,7 +12,6 @@ import {
   Stethoscope,
   PawPrint,
   Plus,
-  Pill,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRequireAuth } from "@/lib/auth-guard";
@@ -25,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { activeStay, caregivers, medications } from "@/lib/mock-data";
+import { getInitials } from "@/lib/storage";
 
 interface SpecialistRow {
   id: string;
@@ -34,6 +32,15 @@ interface SpecialistRow {
   latitude: number | null;
   longitude: number | null;
   preco_diaria: number | null;
+}
+
+interface ActiveBooking {
+  id: string;
+  data_inicio: string | null;
+  data_fim: string | null;
+  status: string;
+  counterpart_name: string;
+  counterpart_initials: string;
 }
 
 export const Route = createFileRoute("/")({
@@ -55,9 +62,53 @@ const quickActions = [
   { label: "Mensagens", icon: MessageSquare, to: "/mensagens" as const },
 ];
 
+function progressBetween(start: string | null, end: string | null) {
+  if (!start || !end) return 0;
+  const s = new Date(start).getTime();
+  const e = new Date(end).getTime();
+  const now = Date.now();
+  if (now <= s) return 0;
+  if (now >= e) return 100;
+  return ((now - s) / (e - s)) * 100;
+}
+
 function Dashboard() {
   useRequireAuth();
-  const { perfil, pets, isReady, refresh } = useAuth();
+  const { perfil, pets, user, isReady, refresh } = useAuth();
+  const [activeBooking, setActiveBooking] = useState<ActiveBooking | null>(null);
+  const [specialists, setSpecialists] = useState<SpecialistRow[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("bookings")
+        .select("id, data_inicio, data_fim, status, tutor_id, especialista_id")
+        .or(`tutor_id.eq.${user.id},especialista_id.eq.${user.id}`)
+        .in("status", ["confirmada", "pendente"])
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const b = data?.[0];
+      if (b) {
+        const otherId = b.tutor_id === user.id ? b.especialista_id : b.tutor_id;
+        const { data: p } = await supabase.rpc("get_perfil_publico", { _id: otherId });
+        const name = (p as { nome_completo: string }[] | null)?.[0]?.nome_completo ?? "Usuário";
+        setActiveBooking({
+          id: b.id,
+          data_inicio: b.data_inicio,
+          data_fim: b.data_fim,
+          status: b.status,
+          counterpart_name: name,
+          counterpart_initials: getInitials(name) || "MP",
+        });
+      }
+    })();
+
+    (async () => {
+      const { data } = await supabase.rpc("get_especialistas_publicos");
+      setSpecialists(((data as SpecialistRow[] | null) ?? []).slice(0, 8));
+    })();
+  }, [user]);
 
   if (!isReady || !perfil) {
     return (
@@ -72,7 +123,6 @@ function Dashboard() {
   const firstName = perfil.nome_completo.split(" ")[0] || "tutor(a)";
   const isSpecialist = perfil.tipo_utilizador === "especialista";
   const pet = pets[0];
-  const progress = (activeStay.dayCurrent / activeStay.dayTotal) * 100;
 
   return (
     <AppShell>
@@ -85,7 +135,6 @@ function Dashboard() {
             </h1>
           </div>
 
-          {/* Specialist profile card */}
           {isSpecialist && (
             <div className="overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-soft">
               <div className="flex items-start gap-4">
@@ -113,10 +162,8 @@ function Dashboard() {
             </div>
           )}
 
-          {/* Tutor — no pet yet */}
           {!isSpecialist && !pet && <NoPetCard onCreated={refresh} />}
 
-          {/* Tutor pet card with real data */}
           {!isSpecialist && pet && (
             <div className="overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-soft">
               <div className="flex items-start gap-4">
@@ -139,35 +186,35 @@ function Dashboard() {
             </div>
           )}
 
-          {/* Active stay card */}
-          {!isSpecialist && pet && (
+          {activeBooking && (
             <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary to-primary-glow p-6 text-primary-foreground shadow-card">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 sm:flex sm:justify-between">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-primary-foreground/80">
                     <span className="grid h-2 w-2 place-items-center rounded-full bg-white">
                       <span className="h-2 w-2 animate-ping rounded-full bg-white/80" />
                     </span>
-                    Hospedagem ativa
+                    {activeBooking.status === "confirmada" ? "Hospedagem ativa" : "Reserva pendente"}
                   </div>
-                  <h2 className="truncate text-xl font-bold sm:text-2xl">{pet.patologia_cronica ?? activeStay.condition}</h2>
-                  <p className="text-sm text-primary-foreground/85">com {activeStay.specialist}</p>
+                  <h2 className="truncate text-xl font-bold sm:text-2xl">Reserva #{activeBooking.id.slice(0, 8)}</h2>
+                  <p className="text-sm text-primary-foreground/85">com {activeBooking.counterpart_name}</p>
                 </div>
                 <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white/15 text-base font-bold backdrop-blur">
-                  {activeStay.specialistInitials}
+                  {activeBooking.counterpart_initials}
                 </div>
               </div>
-              <div className="mt-6 space-y-2">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-xs font-medium text-primary-foreground/85">
-                    Dia {activeStay.dayCurrent} de {activeStay.dayTotal}
-                  </span>
-                  <span className="text-xs text-primary-foreground/75">Retorno: {activeStay.checkOut}</span>
+              {activeBooking.data_inicio && activeBooking.data_fim && (
+                <div className="mt-6 space-y-2">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs font-medium text-primary-foreground/85">
+                      {new Date(activeBooking.data_inicio).toLocaleDateString("pt-BR")} – {new Date(activeBooking.data_fim).toLocaleDateString("pt-BR")}
+                    </span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
+                    <div className="h-full rounded-full bg-white" style={{ width: `${progressBetween(activeBooking.data_inicio, activeBooking.data_fim)}%` }} />
+                  </div>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
-                  <div className="h-full rounded-full bg-white" style={{ width: `${progress}%` }} />
-                </div>
-              </div>
+              )}
               <div className="mt-6 flex flex-wrap gap-2">
                 <Link to="/monitoramento">
                   <Button variant="secondary" size="sm" className="bg-white text-primary hover:bg-white/90">
@@ -183,34 +230,7 @@ function Dashboard() {
             </div>
           )}
 
-          {/* Medication routine */}
-          {!isSpecialist && pet && (
-            <div>
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Rotina de medicamentos · hoje
-              </h3>
-              <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
-                {medications.slice(0, 4).map((m, i) => (
-                  <div key={i} className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 p-4 ${i < 3 ? "border-b border-border" : ""}`}>
-                    <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${m.done ? "bg-primary/10 text-primary" : "bg-accent text-accent-foreground"}`}>
-                      <Pill className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold">{m.name} · {m.dose}</p>
-                      <p className="text-xs text-muted-foreground">{m.time}</p>
-                    </div>
-                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${m.done ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                      {m.done ? "Aplicado" : "Pendente"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!isSpecialist && <NearbyMap />}
-
-
+          {!isSpecialist && <NearbyMap specialists={specialists} />}
 
           <div>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Ações rápidas</h3>
@@ -230,60 +250,71 @@ function Dashboard() {
             </div>
           </div>
 
-          <div>
-            <div className="mb-3 flex items-end justify-between">
-              <div>
-                <h3 className="text-lg font-bold tracking-tight">Cuidadores em destaque</h3>
-                <p className="text-sm text-muted-foreground">Especialistas verificados perto de você</p>
+          {!isSpecialist && specialists.length > 0 && (
+            <div>
+              <div className="mb-3 flex items-end justify-between">
+                <div>
+                  <h3 className="text-lg font-bold tracking-tight">Cuidadores em destaque</h3>
+                  <p className="text-sm text-muted-foreground">Especialistas verificados na plataforma</p>
+                </div>
+                <Link to="/buscar"><Button variant="ghost" size="sm">Ver todos</Button></Link>
               </div>
-            </div>
-            <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 lg:mx-0 lg:px-0">
-              {caregivers.map((c) => (
-                <article key={c.id} className="group w-64 shrink-0 overflow-hidden rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-card">
-                  <div className="flex items-center gap-3">
-                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary/10 text-base font-bold text-primary">{c.initials}</div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">{c.name}</p>
-                      <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                        <Star className="h-3 w-3 fill-warning text-warning" />
-                        <span className="font-medium text-foreground">{c.rating}</span>
-                        <span>({c.reviews})</span>
+              <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 lg:mx-0 lg:px-0">
+                {specialists.map((c) => (
+                  <article key={c.id} className="group w-64 shrink-0 overflow-hidden rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-card">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary/10 text-base font-bold text-primary">
+                        {getInitials(c.nome_completo) || "MP"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{c.nome_completo}</p>
+                        <p className="truncate text-xs text-muted-foreground">{c.especialidades?.[0] ?? "Especialista"}</p>
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-1">
-                    {c.specialties.map((s) => (
-                      <span key={s} className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground">{s}</span>
-                    ))}
-                  </div>
-                  <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3" /> {c.distanceKm} km</span>
-                    <span className="text-sm font-bold text-foreground">R$ {c.pricePerDay}<span className="text-xs font-normal text-muted-foreground">/dia</span></span>
-                  </div>
-                </article>
-              ))}
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {(c.especialidades ?? []).slice(0, 3).map((s) => (
+                        <span key={s} className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground">{s}</span>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <MapPin className="h-3 w-3" /> {c.latitude && c.longitude ? "Geolocalizado" : "Sem local"}
+                      </span>
+                      <span className="text-sm font-bold text-foreground">
+                        {c.preco_diaria != null ? <>R$ {c.preco_diaria}<span className="text-xs font-normal text-muted-foreground">/dia</span></> : "A combinar"}
+                      </span>
+                    </div>
+                  </article>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <aside className="hidden lg:block">
           <div className="sticky top-8 space-y-4 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Cuidadores próximos</h3>
-              <span className="text-xs text-muted-foreground">São Paulo, SP</span>
+              <Link to="/buscar" className="text-xs text-muted-foreground hover:text-primary">Ver todos</Link>
             </div>
-            <div className="space-y-2">
-              {caregivers.slice(0, 3).map((c) => (
-                <div key={c.id} className="flex items-center gap-3 rounded-xl border border-border p-2.5">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">{c.initials}</div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{c.name}</p>
-                    <p className="text-xs text-muted-foreground">{c.distanceKm} km · R$ {c.pricePerDay}</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-              ))}
-            </div>
+            {specialists.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nenhum especialista cadastrado ainda.</p>
+            ) : (
+              <div className="space-y-2">
+                {specialists.slice(0, 3).map((c) => (
+                  <Link key={c.id} to="/buscar" className="flex items-center gap-3 rounded-xl border border-border p-2.5 hover:border-primary/40">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                      {getInitials(c.nome_completo) || "MP"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{c.nome_completo}</p>
+                      <p className="truncate text-xs text-muted-foreground">{c.especialidades?.[0] ?? "Especialista"}</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </Link>
+                ))}
+              </div>
+            )}
             <div className="flex items-center gap-2 rounded-xl bg-accent/50 p-3 text-xs text-accent-foreground">
               <Shield className="h-4 w-4 shrink-0" />
               <span>Todos os especialistas são verificados pelo CRMV.</span>
@@ -355,27 +386,17 @@ function NoPetCard({ onCreated }: { onCreated: () => Promise<void> }) {
   );
 }
 
-function NearbyMap() {
-  const [markers, setMarkers] = useState<MapSpecialist[]>([]);
-
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase.rpc("get_especialistas_publicos");
-      const rows = ((data as SpecialistRow[] | null) ?? []).filter(
-        (s) => s.latitude != null && s.longitude != null,
-      );
-      setMarkers(
-        rows.map((s) => ({
-          id: s.id,
-          name: s.nome_completo,
-          latitude: s.latitude!,
-          longitude: s.longitude!,
-          specialty: s.especialidades?.[0] ?? null,
-          pricePerDay: s.preco_diaria,
-        })),
-      );
-    })();
-  }, []);
+function NearbyMap({ specialists }: { specialists: SpecialistRow[] }) {
+  const markers: MapSpecialist[] = specialists
+    .filter((s) => s.latitude != null && s.longitude != null)
+    .map((s) => ({
+      id: s.id,
+      name: s.nome_completo,
+      latitude: s.latitude!,
+      longitude: s.longitude!,
+      specialty: s.especialidades?.[0] ?? null,
+      pricePerDay: s.preco_diaria,
+    }));
 
   return (
     <div>
