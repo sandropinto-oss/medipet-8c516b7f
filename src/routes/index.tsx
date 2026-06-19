@@ -96,7 +96,19 @@ function Dashboard() {
   useRequireAuth();
   const { perfil, pets, user, isReady, refresh } = useAuth();
   const [activeBooking, setActiveBooking] = useState<ActiveBooking | null>(null);
+  const [activeStay, setActiveStay] = useState<ActiveStay | null>(null);
   const [specialists, setSpecialists] = useState<SpecialistRow[]>([]);
+  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Browser geolocation (one-shot)
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
+    );
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -124,11 +136,40 @@ function Dashboard() {
       }
     })();
 
+    // Active stay (tutor only) — shows specialist's house 24/7 while pet is hosted
+    (async () => {
+      const { data } = await supabase.rpc("get_reserva_ativa_tutor" as never);
+      const row = (data as ActiveStay[] | null)?.[0];
+      if (row && row.especialista_latitude != null && row.especialista_longitude != null) {
+        setActiveStay(row);
+      } else {
+        setActiveStay(null);
+      }
+    })();
+
     (async () => {
       const { data } = await supabase.rpc("get_especialistas_publicos");
-      setSpecialists(((data as SpecialistRow[] | null) ?? []).slice(0, 8));
+      setSpecialists(((data as SpecialistRow[] | null) ?? []));
     })();
   }, [user]);
+
+  // Sort specialists by distance when we have user location
+  const sortedSpecialists: SpecialistRow[] = (() => {
+    if (!userLoc) return specialists;
+    return [...specialists]
+      .map((s) => ({
+        ...s,
+        distanceKm:
+          s.latitude != null && s.longitude != null
+            ? haversineKm(userLoc, { lat: s.latitude, lng: s.longitude })
+            : null,
+      }))
+      .sort((a, b) => {
+        if (a.distanceKm == null) return 1;
+        if (b.distanceKm == null) return -1;
+        return a.distanceKm - b.distanceKm;
+      });
+  })();
 
   if (!isReady || !perfil) {
     return (
