@@ -27,7 +27,8 @@ const navItems = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { perfil, pets } = useAuth();
+  const navigate = useNavigate();
+  const { perfil, pets, signOut } = useAuth();
 
   const displayName = perfil?.nome_completo || "Bem-vindo";
   const displayInitials = getInitials(displayName) || "MP";
@@ -37,6 +38,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       : pets[0]?.nome
         ? `Tutor(a) · ${pets[0].nome}`
         : "Tutor(a)";
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Sessão encerrada.");
+    navigate({ to: "/login" });
+  };
 
   return (
     <div className="min-h-screen bg-background">
