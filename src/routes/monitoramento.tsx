@@ -1,10 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Activity, Check, Clock, AlertCircle, PawPrint, LineChart as LineChartIcon } from "lucide-react";
+import { Activity, Check, Clock, AlertCircle, PawPrint, LineChart as LineChartIcon, MessageSquare, Home } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { SpecialistsMap, type MapSpecialist } from "@/components/specialists-map";
 import { cn } from "@/lib/utils";
 import { useRequireAuth } from "@/lib/auth-guard";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/integrations/supabase/client";
 import { getMedicationTasks, toggleMedicationTask, type MedicationTask } from "@/lib/storage";
 
 export const Route = createFileRoute("/monitoramento")({
@@ -17,15 +19,37 @@ export const Route = createFileRoute("/monitoramento")({
   component: MonitoringPage,
 });
 
+interface ActiveStay {
+  booking_id: string;
+  data_inicio: string | null;
+  data_fim: string | null;
+  especialista_id: string;
+  especialista_nome: string;
+  especialista_latitude: number;
+  especialista_longitude: number;
+}
+
 function MonitoringPage() {
   useRequireAuth();
-  const { pets } = useAuth();
+  const { pets, user } = useAuth();
   const pet = pets[0];
   const [tasks, setTasks] = useState<MedicationTask[]>([]);
+  const [stay, setStay] = useState<ActiveStay | null>(null);
 
   useEffect(() => {
     setTasks(getMedicationTasks());
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase.rpc("get_reserva_ativa_tutor" as never);
+      const row = (data as ActiveStay[] | null)?.[0];
+      if (row && row.especialista_latitude != null && row.especialista_longitude != null) {
+        setStay(row);
+      }
+    })();
+  }, [user]);
 
   const completedCount = tasks.filter((t) => t.done).length;
   const nextPendingIndex = tasks.findIndex((t) => !t.done);
@@ -43,6 +67,40 @@ function MonitoringPage() {
             {pet ? `Sinais vitais e protocolo clínico de ${pet.nome}` : "Sinais vitais e protocolo clínico do seu pet"}
           </p>
         </div>
+
+        {stay && (
+          <div className="overflow-hidden rounded-2xl border border-primary/30 bg-card shadow-card">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-primary/5 px-5 py-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                <Home className="h-4 w-4" />
+                Casa de {stay.especialista_nome} · ao vivo 24h
+              </div>
+              <Link to="/mensagens" className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1">
+                <MessageSquare className="h-3.5 w-3.5" /> Falar com o especialista
+              </Link>
+            </div>
+            <div className="h-[320px]">
+              <SpecialistsMap
+                specialists={[{
+                  id: stay.especialista_id,
+                  name: stay.especialista_nome,
+                  latitude: stay.especialista_latitude,
+                  longitude: stay.especialista_longitude,
+                } satisfies MapSpecialist]}
+                mode="stay"
+                className="h-full w-full"
+                center={{ lat: stay.especialista_latitude, lng: stay.especialista_longitude }}
+                zoom={15}
+              />
+            </div>
+            {stay.data_inicio && stay.data_fim && (
+              <div className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
+                Hospedagem: {new Date(stay.data_inicio).toLocaleDateString("pt-BR")} – {new Date(stay.data_fim).toLocaleDateString("pt-BR")}
+              </div>
+            )}
+          </div>
+        )}
+
 
         {pet ? (
           <div className="overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-soft">

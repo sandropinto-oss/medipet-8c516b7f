@@ -32,6 +32,7 @@ interface SpecialistRow {
   latitude: number | null;
   longitude: number | null;
   preco_diaria: number | null;
+  distanceKm?: number | null;
 }
 
 interface ActiveBooking {
@@ -41,6 +42,25 @@ interface ActiveBooking {
   status: string;
   counterpart_name: string;
   counterpart_initials: string;
+}
+
+interface ActiveStay {
+  booking_id: string;
+  data_inicio: string | null;
+  data_fim: string | null;
+  especialista_id: string;
+  especialista_nome: string;
+  especialista_latitude: number;
+  especialista_longitude: number;
+}
+
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
 }
 
 export const Route = createFileRoute("/")({
@@ -76,7 +96,19 @@ function Dashboard() {
   useRequireAuth();
   const { perfil, pets, user, isReady, refresh } = useAuth();
   const [activeBooking, setActiveBooking] = useState<ActiveBooking | null>(null);
+  const [activeStay, setActiveStay] = useState<ActiveStay | null>(null);
   const [specialists, setSpecialists] = useState<SpecialistRow[]>([]);
+  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Browser geolocation (one-shot)
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
+    );
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -104,11 +136,40 @@ function Dashboard() {
       }
     })();
 
+    // Active stay (tutor only) — shows specialist's house 24/7 while pet is hosted
+    (async () => {
+      const { data } = await supabase.rpc("get_reserva_ativa_tutor" as never);
+      const row = (data as ActiveStay[] | null)?.[0];
+      if (row && row.especialista_latitude != null && row.especialista_longitude != null) {
+        setActiveStay(row);
+      } else {
+        setActiveStay(null);
+      }
+    })();
+
     (async () => {
       const { data } = await supabase.rpc("get_especialistas_publicos");
-      setSpecialists(((data as SpecialistRow[] | null) ?? []).slice(0, 8));
+      setSpecialists(((data as SpecialistRow[] | null) ?? []));
     })();
   }, [user]);
+
+  // Sort specialists by distance when we have user location
+  const sortedSpecialists: SpecialistRow[] = (() => {
+    if (!userLoc) return specialists;
+    return [...specialists]
+      .map((s) => ({
+        ...s,
+        distanceKm:
+          s.latitude != null && s.longitude != null
+            ? haversineKm(userLoc, { lat: s.latitude, lng: s.longitude })
+            : null,
+      }))
+      .sort((a, b) => {
+        if (a.distanceKm == null) return 1;
+        if (b.distanceKm == null) return -1;
+        return a.distanceKm - b.distanceKm;
+      });
+  })();
 
   if (!isReady || !perfil) {
     return (
@@ -230,7 +291,9 @@ function Dashboard() {
             </div>
           )}
 
-          {!isSpecialist && <NearbyMap specialists={specialists} />}
+          {!isSpecialist && activeStay && <ActiveStayMap stay={activeStay} />}
+
+          {!isSpecialist && !activeStay && <NearbyMap specialists={sortedSpecialists.slice(0, 30)} userLocation={userLoc} />}
 
           <div>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Ações rápidas</h3>
@@ -250,7 +313,7 @@ function Dashboard() {
             </div>
           </div>
 
-          {!isSpecialist && specialists.length > 0 && (
+          {!isSpecialist && sortedSpecialists.length > 0 && (
             <div>
               <div className="mb-3 flex items-end justify-between">
                 <div>
@@ -260,7 +323,7 @@ function Dashboard() {
                 <Link to="/buscar"><Button variant="ghost" size="sm">Ver todos</Button></Link>
               </div>
               <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 lg:mx-0 lg:px-0">
-                {specialists.map((c) => (
+                {sortedSpecialists.slice(0, 8).map((c) => (
                   <article key={c.id} className="group w-64 shrink-0 overflow-hidden rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-card">
                     <div className="flex items-center gap-3">
                       <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary/10 text-base font-bold text-primary">
@@ -297,18 +360,20 @@ function Dashboard() {
               <h3 className="text-sm font-semibold">Cuidadores próximos</h3>
               <Link to="/buscar" className="text-xs text-muted-foreground hover:text-primary">Ver todos</Link>
             </div>
-            {specialists.length === 0 ? (
+            {sortedSpecialists.length === 0 ? (
               <p className="text-xs text-muted-foreground">Nenhum especialista cadastrado ainda.</p>
             ) : (
               <div className="space-y-2">
-                {specialists.slice(0, 3).map((c) => (
+                {sortedSpecialists.slice(0, 3).map((c) => (
                   <Link key={c.id} to="/buscar" className="flex items-center gap-3 rounded-xl border border-border p-2.5 hover:border-primary/40">
                     <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                       {getInitials(c.nome_completo) || "MP"}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{c.nome_completo}</p>
-                      <p className="truncate text-xs text-muted-foreground">{c.especialidades?.[0] ?? "Especialista"}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {c.distanceKm != null ? `${c.distanceKm.toFixed(1)} km · ` : ""}{c.especialidades?.[0] ?? "Especialista"}
+                      </p>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </Link>
@@ -386,7 +451,13 @@ function NoPetCard({ onCreated }: { onCreated: () => Promise<void> }) {
   );
 }
 
-function NearbyMap({ specialists }: { specialists: SpecialistRow[] }) {
+function NearbyMap({
+  specialists,
+  userLocation,
+}: {
+  specialists: SpecialistRow[];
+  userLocation: { lat: number; lng: number } | null;
+}) {
   const markers: MapSpecialist[] = specialists
     .filter((s) => s.latitude != null && s.longitude != null)
     .map((s) => ({
@@ -396,6 +467,7 @@ function NearbyMap({ specialists }: { specialists: SpecialistRow[] }) {
       longitude: s.longitude!,
       specialty: s.especialidades?.[0] ?? null,
       pricePerDay: s.preco_diaria,
+      distanceKm: s.distanceKm ?? null,
     }));
 
   return (
@@ -403,12 +475,76 @@ function NearbyMap({ specialists }: { specialists: SpecialistRow[] }) {
       <div className="mb-3 flex items-end justify-between">
         <div>
           <h3 className="text-lg font-bold tracking-tight">Cuidadores no mapa</h3>
-          <p className="text-sm text-muted-foreground">Especialistas geolocalizados próximos a você</p>
+          <p className="text-sm text-muted-foreground">
+            {userLocation ? "Especialistas próximos a você" : "Ative a localização para ver os mais próximos"}
+          </p>
         </div>
         <Link to="/buscar"><Button variant="ghost" size="sm">Ver todos</Button></Link>
       </div>
-      <div className="h-[280px] overflow-hidden rounded-2xl border border-border shadow-soft">
-        <SpecialistsMap specialists={markers} className="h-full w-full" />
+      <div className="h-[320px] overflow-hidden rounded-2xl border border-border shadow-soft">
+        <SpecialistsMap specialists={markers} className="h-full w-full" userLocation={userLocation} />
+      </div>
+      {markers.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {specialists
+            .filter((s) => s.latitude != null && s.longitude != null)
+            .slice(0, 4)
+            .map((s) => (
+              <Link
+                key={s.id}
+                to="/buscar"
+                className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 hover:border-primary/40"
+              >
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                  {getInitials(s.nome_completo) || "MP"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{s.nome_completo}</p>
+                  <p className="truncate text-xs text-muted-foreground">{s.especialidades?.[0] ?? "Especialista"}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  {s.distanceKm != null && (
+                    <p className="text-xs font-semibold text-primary">{s.distanceKm.toFixed(1)} km</p>
+                  )}
+                  {s.preco_diaria != null && (
+                    <p className="text-[11px] text-muted-foreground">R$ {s.preco_diaria}/dia</p>
+                  )}
+                </div>
+              </Link>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActiveStayMap({ stay }: { stay: ActiveStay }) {
+  const marker: MapSpecialist = {
+    id: stay.especialista_id,
+    name: stay.especialista_nome,
+    latitude: stay.especialista_latitude,
+    longitude: stay.especialista_longitude,
+  };
+
+  return (
+    <div>
+      <div className="mb-3 flex items-end justify-between">
+        <div>
+          <h3 className="text-lg font-bold tracking-tight">Onde seu pet está</h3>
+          <p className="text-sm text-muted-foreground">
+            Casa de {stay.especialista_nome} · monitoramento 24h
+          </p>
+        </div>
+        <Link to="/mensagens"><Button variant="ghost" size="sm"><MessageSquare className="mr-1.5 h-4 w-4" /> Mensagem</Button></Link>
+      </div>
+      <div className="h-[320px] overflow-hidden rounded-2xl border border-primary/30 shadow-card">
+        <SpecialistsMap
+          specialists={[marker]}
+          mode="stay"
+          className="h-full w-full"
+          center={{ lat: stay.especialista_latitude, lng: stay.especialista_longitude }}
+          zoom={15}
+        />
       </div>
     </div>
   );

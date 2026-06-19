@@ -246,6 +246,20 @@ export type Database = {
           nome_completo: string
         }[]
       }
+      get_reserva_ativa_tutor: {
+        Args: never
+        Returns: {
+          booking_id: string
+          data_fim: string
+          data_inicio: string
+          especialista_avatar: string
+          especialista_id: string
+          especialista_latitude: number
+          especialista_longitude: number
+          especialista_nome: string
+          status: string
+        }[]
+      }
     }
     Enums: {
       booking_status:
