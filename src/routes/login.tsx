@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Stethoscope, Mail, Lock, ArrowRight, User } from "lucide-react";
+import { Stethoscope, Mail, Lock, ArrowRight, User, PawPrint } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,8 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+type Role = "tutor" | "especialista";
+
 function LoginPage() {
   useRedirectIfAuthenticated();
   const navigate = useNavigate();
@@ -28,9 +30,9 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [role, setRole] = useState<Role>("tutor");
   const [loading, setLoading] = useState(false);
 
-  // Detect OAuth redirect callback — supabase auto-sets session, then redirect home.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.location.hash.includes("access_token")) {
@@ -57,12 +59,12 @@ function LoginPage() {
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { nome_completo: name.trim(), tipo_utilizador: "tutor" },
+            data: { nome_completo: name.trim(), tipo_utilizador: role },
           },
         });
         if (error) throw error;
         toast.success("Conta criada! Redirecionando…");
-        navigate({ to: "/" });
+        navigate({ to: role === "especialista" ? "/onboarding" : "/" });
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao autenticar.");
@@ -155,14 +157,35 @@ function LoginPage() {
 
           <form className="space-y-4" onSubmit={handleSubmit}>
             {mode === "signup" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="name">Nome completo</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input id="name" type="text" placeholder="Seu nome" className="h-11 pl-9"
-                    value={name} onChange={(e) => setName(e.target.value)} required />
+              <>
+                <div className="space-y-1.5">
+                  <Label>Eu sou…</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <RoleOption
+                      active={role === "tutor"}
+                      onClick={() => setRole("tutor")}
+                      icon={<PawPrint className="h-4 w-4" />}
+                      title="Tutor"
+                      subtitle="Tenho um pet"
+                    />
+                    <RoleOption
+                      active={role === "especialista"}
+                      onClick={() => setRole("especialista")}
+                      icon={<Stethoscope className="h-4 w-4" />}
+                      title="Especialista"
+                      subtitle="Vet. / Estudante"
+                    />
+                  </div>
                 </div>
-              </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="name">Nome completo</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input id="name" type="text" placeholder="Seu nome" className="h-11 pl-9"
+                      value={name} onChange={(e) => setName(e.target.value)} required />
+                  </div>
+                </div>
+              </>
             )}
             <div className="space-y-1.5">
               <Label htmlFor="email">E-mail</Label>
@@ -209,12 +232,35 @@ function LoginPage() {
           <p className="text-center text-sm text-muted-foreground">
             É especialista veterinário?{" "}
             <Link to="/onboarding" className="font-medium text-primary hover:underline">
-              Cadastre-se aqui
+              Faça o cadastro guiado
             </Link>
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+function RoleOption({
+  active, onClick, icon, title, subtitle,
+}: { active: boolean; onClick: () => void; icon: React.ReactNode; title: string; subtitle: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all",
+        active ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-border bg-card hover:border-primary/40",
+      )}
+    >
+      <div className={cn("grid h-8 w-8 place-items-center rounded-lg", active ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground")}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="text-xs text-muted-foreground">{subtitle}</p>
+      </div>
+    </button>
   );
 }
 
