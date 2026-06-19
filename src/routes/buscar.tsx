@@ -22,12 +22,12 @@ export const Route = createFileRoute("/buscar")({
 interface SpecialistRow {
   id: string;
   nome_completo: string;
+  bio: string | null;
   especialidades: string[];
+  avatar_url: string | null;
   latitude: number | null;
   longitude: number | null;
   preco_diaria: number | null;
-  uf: string | null;
-  crmv: string | null;
 }
 
 function BuscarPage() {
@@ -39,10 +39,7 @@ function BuscarPage() {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase
-        .from("perfis")
-        .select("id, nome_completo, especialidades, latitude, longitude, preco_diaria, uf, crmv")
-        .eq("tipo_utilizador", "especialista");
+      const { data, error } = await supabase.rpc("get_especialistas_publicos");
       if (error) toast.error(error.message);
       setList((data as SpecialistRow[] | null) ?? []);
       setLoading(false);
