@@ -32,6 +32,7 @@ interface SpecialistRow {
   latitude: number | null;
   longitude: number | null;
   preco_diaria: number | null;
+  distanceKm?: number | null;
 }
 
 interface ActiveBooking {
@@ -41,6 +42,25 @@ interface ActiveBooking {
   status: string;
   counterpart_name: string;
   counterpart_initials: string;
+}
+
+interface ActiveStay {
+  booking_id: string;
+  data_inicio: string | null;
+  data_fim: string | null;
+  especialista_id: string;
+  especialista_nome: string;
+  especialista_latitude: number;
+  especialista_longitude: number;
+}
+
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
 }
 
 export const Route = createFileRoute("/")({
