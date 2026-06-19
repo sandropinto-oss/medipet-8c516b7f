@@ -1,10 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Activity, Check, Clock, AlertCircle, PawPrint, LineChart as LineChartIcon } from "lucide-react";
+import { Activity, Check, Clock, AlertCircle, PawPrint, LineChart as LineChartIcon, MessageSquare, Home } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { SpecialistsMap, type MapSpecialist } from "@/components/specialists-map";
 import { cn } from "@/lib/utils";
 import { useRequireAuth } from "@/lib/auth-guard";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/integrations/supabase/client";
 import { getMedicationTasks, toggleMedicationTask, type MedicationTask } from "@/lib/storage";
 
 export const Route = createFileRoute("/monitoramento")({
@@ -17,15 +19,37 @@ export const Route = createFileRoute("/monitoramento")({
   component: MonitoringPage,
 });
 
+interface ActiveStay {
+  booking_id: string;
+  data_inicio: string | null;
+  data_fim: string | null;
+  especialista_id: string;
+  especialista_nome: string;
+  especialista_latitude: number;
+  especialista_longitude: number;
+}
+
 function MonitoringPage() {
   useRequireAuth();
-  const { pets } = useAuth();
+  const { pets, user } = useAuth();
   const pet = pets[0];
   const [tasks, setTasks] = useState<MedicationTask[]>([]);
+  const [stay, setStay] = useState<ActiveStay | null>(null);
 
   useEffect(() => {
     setTasks(getMedicationTasks());
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase.rpc("get_reserva_ativa_tutor" as never);
+      const row = (data as ActiveStay[] | null)?.[0];
+      if (row && row.especialista_latitude != null && row.especialista_longitude != null) {
+        setStay(row);
+      }
+    })();
+  }, [user]);
 
   const completedCount = tasks.filter((t) => t.done).length;
   const nextPendingIndex = tasks.findIndex((t) => !t.done);
