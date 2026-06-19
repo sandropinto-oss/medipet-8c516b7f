@@ -14,6 +14,67 @@ export type Database = {
   }
   public: {
     Tables: {
+      bookings: {
+        Row: {
+          created_at: string
+          data_fim: string | null
+          data_inicio: string | null
+          especialista_id: string
+          id: string
+          observacoes: string | null
+          pet_id: string | null
+          status: Database["public"]["Enums"]["booking_status"]
+          tutor_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          especialista_id: string
+          id?: string
+          observacoes?: string | null
+          pet_id?: string | null
+          status?: Database["public"]["Enums"]["booking_status"]
+          tutor_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          especialista_id?: string
+          id?: string
+          observacoes?: string | null
+          pet_id?: string | null
+          status?: Database["public"]["Enums"]["booking_status"]
+          tutor_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_especialista_id_fkey"
+            columns: ["especialista_id"]
+            isOneToOne: false
+            referencedRelation: "perfis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_tutor_id_fkey"
+            columns: ["tutor_id"]
+            isOneToOne: false
+            referencedRelation: "perfis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       perfis: {
         Row: {
           avatar_url: string | null
@@ -25,8 +86,11 @@ export type Database = {
           especialidades: string[]
           id: string
           instituicao: string | null
+          latitude: number | null
+          longitude: number | null
           matricula: string | null
           nome_completo: string
+          preco_diaria: number | null
           tipo_utilizador: Database["public"]["Enums"]["user_type"]
           uf: string | null
           updated_at: string
@@ -41,8 +105,11 @@ export type Database = {
           especialidades?: string[]
           id: string
           instituicao?: string | null
+          latitude?: number | null
+          longitude?: number | null
           matricula?: string | null
           nome_completo?: string
+          preco_diaria?: number | null
           tipo_utilizador?: Database["public"]["Enums"]["user_type"]
           uf?: string | null
           updated_at?: string
@@ -57,8 +124,11 @@ export type Database = {
           especialidades?: string[]
           id?: string
           instituicao?: string | null
+          latitude?: number | null
+          longitude?: number | null
           matricula?: string | null
           nome_completo?: string
+          preco_diaria?: number | null
           tipo_utilizador?: Database["public"]["Enums"]["user_type"]
           uf?: string | null
           updated_at?: string
@@ -126,6 +196,12 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      booking_status:
+        | "pendente"
+        | "confirmada"
+        | "em_andamento"
+        | "concluida"
+        | "cancelada"
       user_type: "tutor" | "especialista"
     }
     CompositeTypes: {
@@ -254,6 +330,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      booking_status: [
+        "pendente",
+        "confirmada",
+        "em_andamento",
+        "concluida",
+        "cancelada",
+      ],
       user_type: ["tutor", "especialista"],
     },
   },

@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   History,
@@ -7,23 +7,28 @@ import {
   User,
   Stethoscope,
   Bell,
+  LogOut,
+  Search,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getInitials } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
+import { Button } from "@/components/ui/button";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/buscar", label: "Buscar", icon: Search },
   { to: "/historico", label: "Histórico", icon: History },
-  { to: "/monitoramento", label: "Monitoramento", icon: Activity },
   { to: "/mensagens", label: "Mensagens", icon: MessageSquare },
   { to: "/perfil", label: "Perfil", icon: User },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { perfil, pets } = useAuth();
+  const navigate = useNavigate();
+  const { perfil, pets, signOut } = useAuth();
 
   const displayName = perfil?.nome_completo || "Bem-vindo";
   const displayInitials = getInitials(displayName) || "MP";
@@ -33,6 +38,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       : pets[0]?.nome
         ? `Tutor(a) · ${pets[0].nome}`
         : "Tutor(a)";
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Sessão encerrada.");
+    navigate({ to: "/login" });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -69,7 +80,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
-        <div className="border-t border-sidebar-border p-4">
+        <div className="space-y-2 border-t border-sidebar-border p-4">
           <div className="flex items-center gap-3 rounded-xl bg-accent/50 p-3">
             {perfil?.avatar_url ? (
               <img src={perfil.avatar_url} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
@@ -83,6 +94,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               <p className="truncate text-xs text-muted-foreground">{displaySubtitle}</p>
             </div>
           </div>
+          <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-muted-foreground" onClick={handleSignOut}>
+            <LogOut className="h-4 w-4" /> Sair
+          </Button>
         </div>
       </aside>
 

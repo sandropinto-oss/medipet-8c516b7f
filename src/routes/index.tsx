@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Search,
   FileHeart,
@@ -20,11 +20,21 @@ import { useRequireAuth } from "@/lib/auth-guard";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
+import { SpecialistsMap, type MapSpecialist } from "@/components/specialists-map";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { activeStay, caregivers, medications } from "@/lib/mock-data";
+
+interface SpecialistRow {
+  id: string;
+  nome_completo: string;
+  especialidades: string[];
+  latitude: number | null;
+  longitude: number | null;
+  preco_diaria: number | null;
+}
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -39,9 +49,9 @@ export const Route = createFileRoute("/")({
 });
 
 const quickActions = [
-  { label: "Buscar cuidador", icon: Search, to: "/" as const },
+  { label: "Buscar cuidador", icon: Search, to: "/buscar" as const },
   { label: "Histórico clínico", icon: FileHeart, to: "/historico" as const },
-  { label: "Nova reserva", icon: CalendarPlus, to: "/" as const },
+  { label: "Nova reserva", icon: CalendarPlus, to: "/buscar" as const },
   { label: "Mensagens", icon: MessageSquare, to: "/mensagens" as const },
 ];
 
@@ -198,6 +208,10 @@ function Dashboard() {
             </div>
           )}
 
+          {!isSpecialist && <NearbyMap />}
+
+
+
           <div>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Ações rápidas</h3>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -337,6 +351,47 @@ function NoPetCard({ onCreated }: { onCreated: () => Promise<void> }) {
           </form>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function NearbyMap() {
+  const [markers, setMarkers] = useState<MapSpecialist[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("perfis")
+        .select("id, nome_completo, especialidades, latitude, longitude, preco_diaria")
+        .eq("tipo_utilizador", "especialista")
+        .not("latitude", "is", null)
+        .not("longitude", "is", null);
+      const rows = (data as SpecialistRow[] | null) ?? [];
+      setMarkers(
+        rows.map((s) => ({
+          id: s.id,
+          name: s.nome_completo,
+          latitude: s.latitude!,
+          longitude: s.longitude!,
+          specialty: s.especialidades?.[0] ?? null,
+          pricePerDay: s.preco_diaria,
+        })),
+      );
+    })();
+  }, []);
+
+  return (
+    <div>
+      <div className="mb-3 flex items-end justify-between">
+        <div>
+          <h3 className="text-lg font-bold tracking-tight">Cuidadores no mapa</h3>
+          <p className="text-sm text-muted-foreground">Especialistas geolocalizados próximos a você</p>
+        </div>
+        <Link to="/buscar"><Button variant="ghost" size="sm">Ver todos</Button></Link>
+      </div>
+      <div className="h-[280px] overflow-hidden rounded-2xl border border-border shadow-soft">
+        <SpecialistsMap specialists={markers} className="h-full w-full" />
+      </div>
     </div>
   );
 }
