@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useRequireAuth } from "@/lib/auth-guard";
-import { useAuth } from "@/lib/auth-context";
+
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
