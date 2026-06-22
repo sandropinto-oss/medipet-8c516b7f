@@ -19,6 +19,7 @@ export type Database = {
           created_at: string
           data_fim: string | null
           data_inicio: string | null
+          duracao_horas: number | null
           especialista_id: string
           id: string
           observacoes: string | null
@@ -26,11 +27,13 @@ export type Database = {
           status: Database["public"]["Enums"]["booking_status"]
           tutor_id: string
           updated_at: string
+          valor_total: number | null
         }
         Insert: {
           created_at?: string
           data_fim?: string | null
           data_inicio?: string | null
+          duracao_horas?: number | null
           especialista_id: string
           id?: string
           observacoes?: string | null
@@ -38,11 +41,13 @@ export type Database = {
           status?: Database["public"]["Enums"]["booking_status"]
           tutor_id: string
           updated_at?: string
+          valor_total?: number | null
         }
         Update: {
           created_at?: string
           data_fim?: string | null
           data_inicio?: string | null
+          duracao_horas?: number | null
           especialista_id?: string
           id?: string
           observacoes?: string | null
@@ -50,6 +55,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["booking_status"]
           tutor_id?: string
           updated_at?: string
+          valor_total?: number | null
         }
         Relationships: [
           {
