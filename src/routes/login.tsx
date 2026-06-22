@@ -54,7 +54,7 @@ function LoginPage() {
           toast.error("Informe seu nome completo.");
           return;
         }
-        const { error } = await supabase.auth.signUp({
+        const { data: signUpData, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -63,6 +63,11 @@ function LoginPage() {
           },
         });
         if (error) throw error;
+        // If email confirmation is required there's no session — sign in explicitly.
+        if (!signUpData.session) {
+          const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+          if (signInErr) throw signInErr;
+        }
         toast.success("Conta criada! Redirecionando…");
         navigate({ to: role === "especialista" ? "/onboarding" : "/" });
       }
