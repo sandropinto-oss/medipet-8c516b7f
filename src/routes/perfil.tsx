@@ -509,7 +509,7 @@ function EditProfileDialog({ perfil, isSpecialist }: { perfil: Perfil; isSpecial
               </div>
               <div>
                 <Label>Especialidades (separe por vírgula)</Label>
-                <Input value={form.especialidades} placeholder="Cardiologia, Oncologia"
+                <Input value={form.especialidades} placeholder="Cardiologia Veterinária, Oncologia Veterinária"
                   onChange={(e) => setForm({ ...form, especialidades: e.target.value })} />
               </div>
               <div>
