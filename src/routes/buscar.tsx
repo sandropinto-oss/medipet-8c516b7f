@@ -47,21 +47,22 @@ function priceFor(kind: DurationKind, days: number): { total: number; label: str
 }
 
 function BuscarPage() {
-  useRequireAuth();
+  const { user, isReady } = useRequireAuth();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [list, setList] = useState<SpecialistRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<SpecialistRow | null>(null);
 
   useEffect(() => {
+    if (!isReady || !user) return;
     (async () => {
+      setLoading(true);
       const { data, error } = await supabase.rpc("get_especialistas_publicos");
       if (error) toast.error(error.message);
       setList((data as SpecialistRow[] | null) ?? []);
       setLoading(false);
     })();
-  }, []);
+  }, [isReady, user]);
 
   const geo = list.filter((s) => s.latitude != null && s.longitude != null);
   const markers: MapSpecialist[] = geo.map((s) => ({
