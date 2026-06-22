@@ -47,8 +47,22 @@ const steps = [
 ];
 
 const specialties = [
-  "Diabetes", "Insuficiência Renal", "Cardiopatia", "Geriatria", "Oncologia",
-  "Endocrinologia", "Pós-operatório", "Neurologia", "Dermatologia", "Filhotes",
+  "Cirurgia Veterinária",
+  "Dermatologia Veterinária",
+  "Cardiologia Veterinária",
+  "Oncologia Veterinária",
+  "Neurologia Veterinária",
+  "Ortopedia Veterinária",
+  "Oftalmologia Veterinária",
+  "Endocrinologia Veterinária",
+  "Nefrologia Veterinária",
+  "Gastroenterologia Veterinária",
+  "Medicina Felina",
+  "Medicina de Animais Exóticos",
+  "Anestesiologia Veterinária",
+  "Odontologia Veterinária",
+  "Nutrição Animal",
+  "Reprodução Animal",
 ];
 
 function OnboardingPage() {
